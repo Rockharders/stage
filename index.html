@@ -2,15 +2,17 @@
 <html lang="de">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <title>Bühne</title>
 <style>
   :root { --bg:#0b0b0c; --panel:#141416; --panel2:#1c1c1f; --fg:#f2f2f2; --dim:#7a7a80; --line:#2a2a2e;
     --string:#55555b; --accent:#c6ff3d; --mute:#e5392b; --size:34px; }
   * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
-  html, body { margin:0; background:var(--bg); color:var(--fg);
+  html, body { margin:0; height:100%; overflow:hidden; background:var(--bg); color:var(--fg); touch-action:manipulation;
     font:400 17px/1.4 -apple-system,"Helvetica Neue",sans-serif; -webkit-text-size-adjust:100%; }
+  body { display:flex; flex-direction:column; height:100dvh; }
+  #scroll { flex:1; min-height:0; overflow-y:auto; -webkit-overflow-scrolling:touch; overscroll-behavior:contain; }
   button, input, select, textarea { font:inherit; color:var(--fg); }
   button { background:var(--panel2); border:1px solid var(--line); border-radius:10px; padding:8px 14px; cursor:pointer; }
   button:active { background:#26262a; }
@@ -19,7 +21,7 @@
   button.armed { background:var(--mute); border-color:var(--mute); color:#fff; }
 
   /* ---------- Kopf ---------- */
-  header { position:sticky; top:0; z-index:5; background:var(--bg); border-bottom:1px solid var(--line);
+  header { flex:none; z-index:5; background:var(--bg); border-bottom:1px solid var(--line);
     padding:calc(env(safe-area-inset-top) + 10px) 20px 0; }
   .row { display:flex; align-items:center; gap:14px; padding-bottom:10px; }
   header h1 { flex:1; margin:0; font-size:24px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
@@ -63,7 +65,17 @@
   .facts { display:grid; grid-template-columns:repeat(auto-fill, minmax(170px, 1fr)); gap:10px; margin-bottom:28px; }
   .fact { background:var(--panel); border-radius:12px; padding:12px 16px; }
   .cap { display:block; font-size:12px; letter-spacing:.14em; text-transform:uppercase; color:var(--dim); margin-bottom:4px; }
-  .fact div { font-size:22px; }
+  .fact div, .fact input { font-size:22px; }
+  .fact input { display:block; width:100%; background:none; border:0; padding:0; outline:none; }
+  .fact input.k { font-size:12px; letter-spacing:.14em; text-transform:uppercase; color:var(--dim); margin-bottom:4px; }
+  .fact input::placeholder { color:#45454a; }
+  .fact.add { background:none; border:2px dashed var(--line); color:var(--dim); font-size:17px; text-align:center; }
+  .sketchbar { display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin-bottom:10px; }
+  .sketchbar .pen { width:36px; height:36px; padding:0; border-radius:50%; border:3px solid var(--bg); outline:1px solid var(--line); }
+  .sketchbar .pen.on { outline:2px solid var(--fg); }
+  .sketchbar button.on { background:var(--accent); border-color:var(--accent); color:#000; }
+  #sketch { display:block; width:100%; background:var(--panel); border:1px solid var(--line); border-radius:12px; touch-action:pan-y; }
+  #sketch.drawing { touch-action:none; border-color:var(--accent); }
   .field { margin:0 0 26px; }
   .chips { display:flex; flex-wrap:wrap; gap:8px; }
   .chip.on { background:var(--accent); border-color:var(--accent); color:#000; }
@@ -148,6 +160,7 @@
   </nav>
 </header>
 
+<div id="scroll">
 <div id="list">
   <div class="tools">
     <button id="load">Laden …</button>
@@ -161,6 +174,7 @@
 <div class="page" id="pInfo"></div>
 <div class="page" id="pChords"></div>
 <div class="page" id="pTabs"></div>
+</div>
 
 <div class="sheet" id="editor"><div class="box"></div></div>
 <div class="sheet" id="picker"><div class="box"><h3></h3><div class="pgrid"></div></div></div>
@@ -202,6 +216,8 @@ function ud() {   // Daten des aktuellen Songs
   return data.songs[k] || (data.songs[k] = { updated: 0, guitar: "", tuning: "std", capo: 0, notes: "", chords: [], tabs: [] });
 }
 function touch() { ud().updated = Date.now(); saveData(); }
+const val = (k, fileVal) => { const u = ud(); return u[k] !== undefined ? u[k] : fileVal; };   // eigener Eintrag vor Datei
+const sceneName = (n) => val("scene" + n, songs[current].scenes[n] || "");
 
 // ---------- ChordPro / Text einlesen ----------
 const KIND = { start_of_verse:1, sov:1, start_of_chorus:1, soc:1, start_of_bridge:1, sob:1, start_of_part:1 };
@@ -425,7 +441,7 @@ function setPage(p) {
   if (p === "info") renderInfo();
   if (p === "chords") renderChords();
   if (p === "tabs") renderTabs();
-  window.scrollTo(0, 0);
+  $("scroll").scrollTop = 0;
 }
 $("pages").onclick = (e) => { const b = e.target.closest("button"); if (b) setPage(b.dataset.p); };
 
@@ -434,11 +450,15 @@ function renderSong() {
   const s = songs[current];
   if (!s) return;
   $("title").textContent = s.title;
-  $("meta").textContent = [s.key, s.tempo ? s.tempo + " BPM" : ""].filter(Boolean).join(" · ");
+  renderMeta();
   $("pText").innerHTML = s.sections.length ? s.sections.map((sec, i) =>
     `<section data-i="${i}">${sec.label ? `<div class="label">${esc(sec.label)}</div>` : ""}<p>${esc(sec.lines.join("\n"))}</p></section>`).join("")
     : `<p class="note">Kein Text vorhanden.</p>`;
   highlight(false);
+}
+function renderMeta() {
+  const s = songs[current], tempo = val("tempo", s.tempo);
+  $("meta").textContent = [val("key", s.key), tempo ? tempo + " BPM" : ""].filter(Boolean).join(" · ");
 }
 function highlight(scroll = true) {
   document.querySelectorAll("#pText section").forEach(el => {
@@ -460,8 +480,8 @@ function openSongNr(nr) {
 }
 function scene(n) {
   const s = songs[current];
-  if (!s || !s.scenes[n]) return;
-  const want = s.scenes[n].toLowerCase();
+  if (!s || !sceneName(n)) return;
+  const want = sceneName(n).toLowerCase();
   for (let step = 1; step <= s.sections.length; step++) {
     const i = (section + step) % s.sections.length;
     if (s.sections[i].label.toLowerCase().startsWith(want)) { section = i; break; }
@@ -472,30 +492,147 @@ function scene(n) {
 // INFO
 function renderInfo() {
   const s = songs[current], u = ud();
-  const facts = [["Tonart", s.key], ["Tempo", s.tempo && s.tempo + " BPM"], ...s.info,
-                 ...s.scenes.map((sc, i) => ["Szene " + "ABCD"[i], sc])].filter(f => f[1]);
+  const own = [["Tonart", "key", s.key], ["Tempo (BPM)", "tempo", s.tempo],
+               ...[0, 1, 2, 3].map(i => ["Szene " + "ABCD"[i], "scene" + i, s.scenes[i] || ""])];
   $("pInfo").innerHTML = `
-    ${facts.length ? `<div class="facts">${facts.map(([k, v]) => `<div class="fact"><span class="cap">${esc(k)}</span><div>${esc(v)}</div></div>`).join("")}</div>` : ""}
+    <div class="facts">
+      ${own.map(([lab, k, fileVal]) => `<label class="fact"><span class="cap">${lab}</span>
+        <input data-own="${k}" value="${esc(val(k, fileVal))}" placeholder="–" autocomplete="off"></label>`).join("")}
+      ${s.info.map(([k, v]) => `<div class="fact"><span class="cap">${esc(k)}</span><div>${esc(v)}</div></div>`).join("")}
+      ${(u.fields || []).map((f, i) => `<div class="fact"><input class="k" data-fk="${i}" value="${esc(f.k)}" placeholder="Feld" autocomplete="off">
+        <input data-fv="${i}" value="${esc(f.v)}" placeholder="–" autocomplete="off"></div>`).join("")}
+      <button class="fact add" id="addField">+ Feld</button>
+    </div>
     <div class="field"><span class="cap">Gitarre</span><div class="chips" id="inGuitar">
       ${GUITARS.map(g => `<button class="chip ${u.guitar === g ? "on" : ""}" data-g="${esc(g)}">${esc(g)}</button>`).join("")}</div></div>
     <div class="field"><span class="cap">Stimmung</span><select id="inTuning">
       ${Object.entries(TUNINGS).map(([k, [lab]]) => `<option value="${k}" ${u.tuning === k ? "selected" : ""}>${esc(lab)}</option>`).join("")}</select></div>
     <div class="field"><span class="cap">Capo</span><div class="stepper">
       <button data-capo="-1">−</button><b>${u.capo || "–"}</b><button data-capo="1">+</button></div></div>
-    <div class="field"><span class="cap">Notizen</span><textarea id="inNotes" placeholder="Hinweise, Einsätze, Sounds …">${esc(u.notes)}</textarea></div>`;
+    <div class="field"><span class="cap">Notizen</span><textarea id="inNotes" placeholder="Hinweise, Einsätze, Sounds …">${esc(u.notes)}</textarea></div>
+    <div class="field"><span class="cap">Skizze</span>
+      <div class="sketchbar">
+        <button id="skMode" class="${sk.on ? "on" : ""}">✎ Zeichnen</button>
+        ${PENS.map(c => `<button class="pen ${!sk.erase && sk.color === c ? "on" : ""}" data-pen="${c}" style="background:${c}" aria-label="Farbe"></button>`).join("")}
+        <button data-sk="erase" class="${sk.erase ? "on" : ""}">Radierer</button>
+        <button data-sk="undo">↶ Zurück</button>
+        <button data-sk="more">+ Platz</button>
+        <span class="grow"></span>
+        <button data-sk="clear" class="danger">Skizze löschen</button>
+      </div>
+      <canvas id="sketch" class="${sk.on ? "drawing" : ""}"></canvas></div>`;
+  sizeSketch();
 }
 $("pInfo").addEventListener("click", (e) => {
-  const u = ud(), g = e.target.closest("[data-g]"), c = e.target.closest("[data-capo]");
+  const u = ud(), g = e.target.closest("[data-g]"), c = e.target.closest("[data-capo]"), b = e.target.closest("button");
   if (g) {
     u.guitar = u.guitar === g.dataset.g ? "" : g.dataset.g;
     if (u.guitar === "Bass VI" && u.tuning === "std") u.tuning = "bass6";       // Bass VI bringt seine Stimmung mit
     else if (u.guitar !== "Bass VI" && u.tuning === "bass6") u.tuning = "std";
   } else if (c) u.capo = Math.max(0, Math.min(12, (u.capo || 0) + +c.dataset.capo));
-  else return;
-  touch(); renderInfo();
+  else if (b && b.id === "addField") { (u.fields = u.fields || []).push({ k: "", v: "" }); }
+  else if (b && b.id === "skMode") sk.on = !sk.on;
+  else if (b && b.dataset.pen) { sk.color = b.dataset.pen; sk.erase = false; sk.on = true; }
+  else if (b && b.dataset.sk) {
+    const d = sketchData();
+    if (b.dataset.sk === "erase") { sk.erase = !sk.erase; sk.on = true; }
+    else if (b.dataset.sk === "undo") d.strokes.pop();
+    else if (b.dataset.sk === "more") d.h = Math.min(4, d.h + 0.4);
+    else if (b.dataset.sk === "clear") {
+      if (!b.classList.contains("armed")) { b.classList.add("armed"); b.textContent = "Wirklich löschen?"; return; }
+      d.strokes = []; d.h = 0.6;
+    }
+  } else return;
+  const y = $("scroll").scrollTop;
+  touch(); renderInfo(); $("scroll").scrollTop = y;
+  if (b && b.id === "addField") { const ins = document.querySelectorAll("[data-fk]"); ins[ins.length - 1].focus(); }
 });
-$("pInfo").addEventListener("change", (e) => { if (e.target.id === "inTuning") { ud().tuning = e.target.value; touch(); } });
-$("pInfo").addEventListener("input", (e) => { if (e.target.id === "inNotes") { ud().notes = e.target.value; touch(); } });
+$("pInfo").addEventListener("change", (e) => {
+  const t = e.target, u = ud();
+  if (t.id === "inTuning") { u.tuning = t.value; touch(); }
+  if (t.dataset.fk !== undefined || t.dataset.fv !== undefined) {   // leere eigene Felder verschwinden
+    const before = (u.fields || []).length;
+    u.fields = (u.fields || []).filter(f => f.k.trim() || f.v.trim());
+    if (u.fields.length !== before) { touch(); renderInfo(); }
+  }
+});
+$("pInfo").addEventListener("input", (e) => {
+  const t = e.target, u = ud();
+  if (t.id === "inNotes") u.notes = t.value;
+  else if (t.dataset.own) { u[t.dataset.own] = t.value.trim(); renderMeta(); }
+  else if (t.dataset.fk !== undefined) u.fields[+t.dataset.fk].k = t.value;
+  else if (t.dataset.fv !== undefined) u.fields[+t.dataset.fv].v = t.value;
+  else return;
+  touch();
+});
+
+// Skizze: Striche als Punkte (relativ zur Breite) – bleibt bei jeder Bildschirmgröße scharf
+const PENS = ["#f2f2f2", "#c6ff3d", "#e5392b", "#4db8ff", "#ffb02e"];
+const sk = { on: false, color: PENS[0], erase: false, sawPen: false, cur: null };
+const sketchData = () => { const u = ud(); return u.sketch || (u.sketch = { h: 0.6, strokes: [] }); };
+function sizeSketch() {
+  const cv = $("sketch");
+  if (!cv) return;
+  const w = cv.clientWidth, dpr = window.devicePixelRatio || 1;
+  cv.style.height = Math.round(w * sketchData().h) + "px";
+  cv.width = Math.round(w * dpr); cv.height = Math.round(w * sketchData().h * dpr);
+  drawSketch();
+}
+function drawStroke(ctx, st, W, from = 1) {
+  ctx.strokeStyle = st.c; ctx.lineCap = "round"; ctx.lineJoin = "round";
+  const p = st.p;
+  if (p.length === 3) { ctx.fillStyle = st.c; ctx.beginPath(); ctx.arc(p[0] * W, p[1] * W, st.w * W * (0.4 + p[2]) / 2, 0, 7); ctx.fill(); return; }
+  for (let i = Math.max(1, from); i < p.length / 3; i++) {
+    ctx.lineWidth = st.w * W * (0.4 + p[i * 3 + 2]);
+    ctx.beginPath(); ctx.moveTo(p[i * 3 - 3] * W, p[i * 3 - 2] * W); ctx.lineTo(p[i * 3] * W, p[i * 3 + 1] * W); ctx.stroke();
+  }
+}
+function drawSketch() {
+  const cv = $("sketch"), ctx = cv.getContext("2d");
+  ctx.clearRect(0, 0, cv.width, cv.height);
+  sketchData().strokes.forEach(st => drawStroke(ctx, st, cv.width));
+}
+function skPoint(e, cv) {
+  const r = cv.getBoundingClientRect(), r4 = (n) => Math.round(n * 10000) / 10000;
+  return [r4((e.clientX - r.left) / r.width), r4((e.clientY - r.top) / r.width),
+          e.pointerType === "pen" ? r4(e.pressure || 0.5) : 0.5];
+}
+function skErase(pt) {
+  const d = sketchData(), n = d.strokes.length;
+  d.strokes = d.strokes.filter(st => {
+    for (let i = 0; i < st.p.length; i += 3) if (Math.hypot(st.p[i] - pt[0], st.p[i + 1] - pt[1]) < 0.02) return false;
+    return true;
+  });
+  if (d.strokes.length !== n) { drawSketch(); touch(); }
+}
+$("pInfo").addEventListener("pointerdown", (e) => {
+  const cv = e.target.closest("#sketch");
+  if (!cv || !sk.on) return;
+  if (e.pointerType === "pen") sk.sawPen = true;
+  if (sk.sawPen && e.pointerType === "touch") return;          // Handballen ignorieren, sobald ein Stift im Spiel ist
+  e.preventDefault(); try { cv.setPointerCapture(e.pointerId); } catch (err) {}
+  if (sk.erase) { sk.cur = "erase"; skErase(skPoint(e, cv)); return; }
+  sk.cur = { c: sk.color, w: 0.005, p: skPoint(e, cv) };
+  drawStroke(cv.getContext("2d"), sk.cur, cv.width);
+});
+$("pInfo").addEventListener("pointermove", (e) => {
+  const cv = e.target.closest("#sketch");
+  if (!cv || !sk.cur) return;
+  const evs = e.getCoalescedEvents ? e.getCoalescedEvents() : [e];
+  for (const ev of evs.length ? evs : [e]) {
+    const pt = skPoint(ev, cv);
+    if (sk.cur === "erase") { skErase(pt); continue; }
+    sk.cur.p.push(...pt);
+    drawStroke(cv.getContext("2d"), sk.cur, cv.width, sk.cur.p.length / 3 - 1);
+  }
+});
+const skEnd = () => {
+  if (sk.cur && sk.cur !== "erase") { sketchData().strokes.push(sk.cur); touch(); }
+  sk.cur = null;
+};
+$("pInfo").addEventListener("pointerup", skEnd);
+$("pInfo").addEventListener("pointercancel", skEnd);
+window.addEventListener("resize", () => { if (page === "info") sizeSketch(); });
 
 // GRIFFE
 function renderChords() {
