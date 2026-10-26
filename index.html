@@ -6,80 +6,210 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <title>Bühne</title>
 <style>
-  :root { --bg:#0b0b0c; --fg:#f2f2f2; --dim:#6e6e74; --line:#232326; --accent:#c6ff3d; --warn:#ff6b5e; --size:34px; }
-  * { box-sizing:border-box; }
+  :root { --bg:#0b0b0c; --panel:#141416; --panel2:#1c1c1f; --fg:#f2f2f2; --dim:#7a7a80; --line:#2a2a2e;
+    --string:#55555b; --accent:#c6ff3d; --mute:#e5392b; --size:34px; }
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
   html, body { margin:0; background:var(--bg); color:var(--fg);
-    font:400 var(--size)/1.35 -apple-system,"Helvetica Neue",sans-serif; -webkit-text-size-adjust:100%; }
-  header { position:sticky; top:0; z-index:2; display:flex; align-items:center; gap:14px;
-    padding:calc(env(safe-area-inset-top) + 10px) 20px 10px; background:var(--bg); border-bottom:1px solid var(--line); font-size:17px; }
+    font:400 17px/1.4 -apple-system,"Helvetica Neue",sans-serif; -webkit-text-size-adjust:100%; }
+  button, input, select, textarea { font:inherit; color:var(--fg); }
+  button { background:var(--panel2); border:1px solid var(--line); border-radius:10px; padding:8px 14px; cursor:pointer; }
+  button:active { background:#26262a; }
+  button.primary { background:var(--accent); border-color:var(--accent); color:#000; font-weight:600; }
+  button.danger { color:var(--mute); }
+  button.armed { background:var(--mute); border-color:var(--mute); color:#fff; }
+
+  /* ---------- Kopf ---------- */
+  header { position:sticky; top:0; z-index:5; background:var(--bg); border-bottom:1px solid var(--line);
+    padding:calc(env(safe-area-inset-top) + 10px) 20px 0; }
+  .row { display:flex; align-items:center; gap:14px; padding-bottom:10px; }
   header h1 { flex:1; margin:0; font-size:24px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   .meta { color:var(--dim); white-space:nowrap; }
-  .midi { display:flex; align-items:center; gap:6px; color:var(--dim); white-space:nowrap; }
-  .dot { width:10px; height:10px; border-radius:50%; background:var(--warn); }
+  .midi { display:flex; align-items:center; gap:6px; color:var(--dim); white-space:nowrap; max-width:220px; overflow:hidden; }
+  .dot { flex:none; width:10px; height:10px; border-radius:50%; background:var(--mute); }
   .dot.on { background:var(--accent); }
-  button { font:inherit; font-size:17px; color:var(--fg); background:#1b1b1e; border:1px solid var(--line);
-    border-radius:10px; padding:8px 14px; }
-  main { padding:20px 20px 60vh; }
-  section { padding:12px 16px; margin:0 0 10px; border-left:4px solid transparent; color:var(--dim);
-    transition:color .2s, background .2s; }
-  section.current { color:var(--fg); border-left-color:var(--accent); background:#141416; }
-  .label { font-size:14px; letter-spacing:.12em; text-transform:uppercase; color:var(--accent); margin-bottom:6px; }
-  section p { margin:0; white-space:pre-wrap; }
-  .note { color:var(--dim); font-style:italic; }
-  #list { display:none; padding:calc(env(safe-area-inset-top) + 16px) 20px 40px; }
+  .size { display:none; gap:6px; }
+  body[data-page=text]:not(.listing) .size { display:flex; }
+  nav.pages { display:flex; gap:4px; margin:0 -6px; }
+  nav.pages button { background:none; border:0; border-bottom:2px solid transparent; border-radius:0; padding:10px 14px 12px;
+    font-size:14px; font-weight:600; letter-spacing:.14em; color:var(--dim); }
+  nav.pages button.on { color:var(--accent); border-bottom-color:var(--accent); }
+  body.listing nav.pages { display:none; }
+
+  .page { display:none; padding:20px 20px 40vh; }
+  body:not(.listing)[data-page=text] #pText, body:not(.listing)[data-page=info] #pInfo,
+  body:not(.listing)[data-page=chords] #pChords, body:not(.listing)[data-page=tabs] #pTabs { display:block; }
+
+  /* ---------- Songliste ---------- */
+  #list { display:none; padding:20px 20px 40px; }
   body.listing #list { display:block; }
-  body.listing main { display:none; }
   #list a { display:flex; gap:16px; padding:14px 0; border-bottom:1px solid var(--line); color:var(--fg);
     text-decoration:none; font-size:24px; }
   #list a span { color:var(--dim); min-width:2em; }
   #list a.active { color:var(--accent); }
   .tools { display:flex; flex-wrap:wrap; gap:10px; margin:0 0 18px; }
-  .hint { color:var(--dim); font-size:17px; line-height:1.5; }
+  .hint { color:var(--dim); line-height:1.5; }
   input[type=file] { display:none; }
+
+  /* ---------- TEXT ---------- */
+  #pText { font-size:var(--size); line-height:1.35; }
+  #pText section { padding:12px 16px; margin:0 0 10px; border-left:4px solid transparent; color:var(--dim);
+    transition:color .2s, background .2s; }
+  #pText section.current { color:var(--fg); border-left-color:var(--accent); background:var(--panel); }
+  .label { font-size:14px; letter-spacing:.12em; text-transform:uppercase; color:var(--accent); margin-bottom:6px; }
+  #pText section p { margin:0; white-space:pre-wrap; }
+  .note { color:var(--dim); font-style:italic; }
+
+  /* ---------- INFO ---------- */
+  .facts { display:grid; grid-template-columns:repeat(auto-fill, minmax(170px, 1fr)); gap:10px; margin-bottom:28px; }
+  .fact { background:var(--panel); border-radius:12px; padding:12px 16px; }
+  .cap { display:block; font-size:12px; letter-spacing:.14em; text-transform:uppercase; color:var(--dim); margin-bottom:4px; }
+  .fact div { font-size:22px; }
+  .field { margin:0 0 26px; }
+  .chips { display:flex; flex-wrap:wrap; gap:8px; }
+  .chip.on { background:var(--accent); border-color:var(--accent); color:#000; }
+  select { background:var(--panel2); border:1px solid var(--line); border-radius:10px; padding:9px 12px; font-size:17px; }
+  .stepper { display:inline-flex; align-items:center; gap:12px; }
+  .stepper b { min-width:2.2em; text-align:center; font-size:22px; font-weight:500; }
+  textarea { width:100%; min-height:38vh; background:var(--panel); border:1px solid var(--line); border-radius:12px;
+    padding:14px 16px; font-size:20px; line-height:1.5; resize:vertical; }
+
+  /* ---------- GRIFFE ---------- */
+  .cgrid { display:grid; grid-template-columns:repeat(auto-fill, minmax(160px, 1fr)); gap:14px; }
+  .ccard { background:var(--panel); border:1px solid transparent; border-radius:14px; padding:12px 8px 8px; text-align:center; }
+  .ccard .nm { font-size:24px; font-weight:600; min-height:1.3em; }
+  .ccard svg { display:block; width:100%; height:auto; }
+  .ccard.add { display:flex; align-items:center; justify-content:center; min-height:220px; background:none;
+    border:2px dashed var(--line); color:var(--dim); font-size:20px; }
+  .empty { color:var(--dim); margin:0 0 18px; }
+
+  /* ---------- Fenster ---------- */
+  .sheet { position:fixed; inset:0; z-index:10; display:none; align-items:center; justify-content:center;
+    background:rgba(0,0,0,.72); padding:20px; }
+  .sheet.open { display:flex; }
+  .box { background:#111113; border:1px solid var(--line); border-radius:18px; padding:20px;
+    width:100%; max-width:880px; max-height:100%; overflow:auto; }
+  #editor .box { display:grid; grid-template-columns:minmax(240px, 380px) 1fr; gap:28px; align-items:start; }
+  #editor svg { width:100%; height:auto; touch-action:manipulation; }
+  #editor .side { display:flex; flex-direction:column; gap:22px; }
+  #edName { width:100%; background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:10px 14px;
+    font-size:30px; font-weight:600; }
+  .btns { display:flex; flex-wrap:wrap; gap:8px; }
+  .grow { flex:1; }
+  @media (max-width:720px) { #editor .box { grid-template-columns:1fr; } }
+  #picker { z-index:20; }
+  #picker .box { max-width:520px; }
+  #picker h3 { margin:0 0 14px; font-size:15px; font-weight:600; letter-spacing:.12em; text-transform:uppercase; color:var(--dim); }
+  .pgrid { display:grid; grid-template-columns:repeat(6, 1fr); gap:8px; }
+  .pgrid button { height:58px; padding:0; font-size:22px; font-weight:500; }
+  .pgrid button.x { color:var(--mute); }
+  .pgrid button.wide { grid-column:span 2; font-size:17px; }
+  .pgrid button.on { background:var(--accent); border-color:var(--accent); color:#000; }
+  #textbox textarea { min-height:40vh; font:15px/1.45 ui-monospace,Menlo,monospace; white-space:pre; }
+
+  /* ---------- TABS ---------- */
+  .tabblock { background:var(--panel); border-radius:14px; padding:12px 0 14px; margin:0 0 18px; }
+  .tabhead { display:flex; align-items:center; gap:8px; padding:0 14px 10px; }
+  .tabhead input { flex:1; min-width:0; background:none; border:0; border-bottom:1px solid transparent; padding:6px 2px;
+    font-size:22px; font-weight:600; }
+  .tabhead input:focus { outline:none; border-bottom-color:var(--line); }
+  .staff { display:flex; overflow-x:auto; -webkit-overflow-scrolling:touch; padding:0 14px 6px; }
+  .names { flex:none; position:sticky; left:-14px; z-index:1; background:var(--panel); padding:0 8px 0 0; }
+  .names div, .tcol .c { height:40px; display:flex; align-items:center; justify-content:center; }
+  .names div { width:24px; color:var(--dim); font-size:15px; font-weight:600; }
+  .names .hd, .tcol .hd { height:24px; }
+  .tcol { flex:none; width:46px; }
+  .tcol .hd { display:flex; align-items:center; justify-content:center; font-size:12px; color:var(--dim); }
+  .tcol .cells { border-left:2px solid transparent; }
+  .names + .tcol .cells, .tcol.bar + .tcol .cells { border-left-color:#77777d; }
+  .tcol:last-child .cells { border-right:2px solid #77777d; }
+  .tcol .c { position:relative; }
+  .tcol .c::before { content:""; position:absolute; left:0; right:0; top:50%; height:1px; background:var(--string); }
+  .tcol .c span { position:relative; min-width:30px; height:30px; padding:0 6px; border-radius:15px; background:var(--panel);
+    display:flex; align-items:center; justify-content:center; font-size:19px; font-weight:600; }
+  .tcol .c span.x { color:var(--mute); }
+  .tcol.sel { background:rgba(198,255,61,.08); }
+  .tcol.sel .hd { color:var(--accent); font-weight:700; }
+  .tabtools { display:flex; flex-wrap:wrap; gap:8px; padding:10px 14px 0; }
+  .tabtools button { font-size:15px; padding:7px 12px; }
 </style>
 </head>
-<body class="listing">
+<body class="listing" data-page="text">
 <header>
-  <div class="midi"><div class="dot" id="dot"></div><span id="midiText">MIDI</span></div>
-  <h1 id="title">Songs</h1>
-  <span class="meta" id="meta"></span>
-  <button id="smaller" aria-label="Schrift kleiner">A−</button>
-  <button id="bigger" aria-label="Schrift größer">A+</button>
-  <button id="toggleList">Songs</button>
+  <div class="row">
+    <div class="midi"><div class="dot" id="dot"></div><span id="midiText">MIDI</span></div>
+    <h1 id="title">Songs</h1>
+    <span class="meta" id="meta"></span>
+    <div class="size"><button id="smaller" aria-label="Schrift kleiner">A−</button><button id="bigger" aria-label="Schrift größer">A+</button></div>
+    <button id="toggleList">Songs</button>
+  </div>
+  <nav class="pages" id="pages">
+    <button data-p="text">TEXT</button><button data-p="info">INFO</button>
+    <button data-p="chords">GRIFFE</button><button data-p="tabs">TABS</button>
+  </nav>
 </header>
-<nav id="list">
+
+<div id="list">
   <div class="tools">
-    <button id="load">Songs laden …</button>
+    <button id="load">Laden …</button>
+    <button id="backup">Sichern</button>
     <input type="file" id="file" multiple>
   </div>
   <div id="songs"></div>
   <p class="hint" id="hint"></p>
-</nav>
-<main id="main"></main>
+</div>
+<main class="page" id="pText"></main>
+<div class="page" id="pInfo"></div>
+<div class="page" id="pChords"></div>
+<div class="page" id="pTabs"></div>
+
+<div class="sheet" id="editor"><div class="box"></div></div>
+<div class="sheet" id="picker"><div class="box"><h3></h3><div class="pgrid"></div></div></div>
+<div class="sheet" id="textbox"><div class="box">
+  <div class="tabhead" style="padding:0 0 12px"><b class="grow" id="tbTitle"></b><button id="tbCopy">Kopieren</button>
+    <button id="tbSave">Als Datei</button><button class="primary" id="tbClose">Fertig</button></div>
+  <textarea id="tbText" readonly></textarea>
+</div></div>
 
 <script>
 const $ = (id) => document.getElementById(id);
-const STORE = "stage-songs-v1";
+const STORE = "stage-songs-v1", DATA = "stage-data-v1";
 const CH = 16, SCENE_CC = 20;
-let songs = [];      // {nr, title, tempo, key, scenes[], sections[{label, lines[]}]}
-let current = null;  // index in songs
+let songs = [];      // aus den Dateien: {nr, title, tempo, key, scenes[], info[[k, v]], sections[{label, lines[]}]}
+let data = { v: 1, songs: {} };   // am iPad gebaut: Griffe, Tabs, Notizen pro Song
+let current = null;  // Index in songs
 let section = 0;
+let page = "text";
 
 // ---------- Speicher ----------
 function save() { try { localStorage.setItem(STORE, JSON.stringify(songs)); } catch (e) {} }
+let saveTimer = null;
+function saveData() {
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(() => { try { localStorage.setItem(DATA, JSON.stringify(data)); } catch (e) {} }, 300);
+}
 function restore() {
   try { songs = JSON.parse(localStorage.getItem(STORE) || "[]"); } catch (e) { songs = []; }
+  try { data = JSON.parse(localStorage.getItem(DATA) || "") || data; } catch (e) {}
+  if (!data.songs) data.songs = {};
+  try { navigator.storage && navigator.storage.persist && navigator.storage.persist(); } catch (e) {}
 }
 function setting(key, value) {
   try { if (value === undefined) return localStorage.getItem(key); localStorage.setItem(key, value); } catch (e) {}
 }
+const songKey = (s) => s.title.toLowerCase().replace(/[^a-z0-9äöüß]+/g, " ").trim();
+function ud() {   // Daten des aktuellen Songs
+  const k = songKey(songs[current]);
+  return data.songs[k] || (data.songs[k] = { updated: 0, guitar: "", tuning: "std", capo: 0, notes: "", chords: [], tabs: [] });
+}
+function touch() { ud().updated = Date.now(); saveData(); }
 
 // ---------- ChordPro / Text einlesen ----------
 const KIND = { start_of_verse:1, sov:1, start_of_chorus:1, soc:1, start_of_bridge:1, sob:1, start_of_part:1 };
+const INFO_KEYS = { capo:"Capo", artist:"Interpret", time:"Takt", duration:"Dauer", composer:"Komponist" };
 function parse(name, text) {
   const nrMatch = name.match(/^(\d+)/);
   const song = { nr: nrMatch ? parseInt(nrMatch[1], 10) : 0, title: name.replace(/^\d+[_ -]*/, "").replace(/\.[^.]+$/, ""),
-                 tempo: "", key: "", scenes: [], sections: [] };
+                 tempo: "", key: "", scenes: [], info: [], sections: [] };
   let sec = null;
   const open = (label) => { sec = { label, lines: [] }; song.sections.push(sec); };
   for (const raw of text.replace(/\r/g, "").split("\n")) {
@@ -91,6 +221,8 @@ function parse(name, text) {
       else if (k === "tempo") song.tempo = v;
       else if (k === "key") song.key = v;
       else if (k === "meta" && v.startsWith("mc8scenes")) song.scenes = v.replace("mc8scenes", "").trim().split("|");
+      else if (k === "meta") { const m = v.match(/^(\S+)\s+(.*)$/); if (m) song.info.push([m[1], m[2]]); }
+      else if (INFO_KEYS[k]) song.info.push([INFO_KEYS[k], v]);
       else if (KIND[k]) open(v || k.replace(/^start_of_|^so/, "").replace("v", "verse").replace("c", "chorus").replace("b", "bridge"));
       else if (k.startsWith("end_of") || ["eov", "eoc", "eob"].includes(k)) sec = null;
       else if ((k === "comment" || k === "c") && !/^MC8 Song/.test(v)) open(v);
@@ -105,53 +237,222 @@ function parse(name, text) {
   song.sections = song.sections.filter(s => s.label || s.lines.some(l => l.trim()));
   return song;
 }
+function mergeSongs(loaded) {
+  const byNr = new Map(songs.map(s => [s.nr + "|" + s.title, s]));
+  loaded.forEach(s => byNr.set(s.nr + "|" + s.title, s));
+  songs = [...byNr.values()].sort((a, b) => a.nr - b.nr || a.title.localeCompare(b.title));
+  save();
+}
 
+// Laden: Songtexte (.chopro/.txt) oder eine Sicherung (.json) – am Inhalt erkannt
 $("load").onclick = () => $("file").click();
 $("file").onchange = async (e) => {
   const files = [...e.target.files];
   if (!files.length) return;
   const loaded = [];
-  for (const f of files) loaded.push(parse(f.name, await f.text()));
-  const byNr = new Map(songs.map(s => [s.nr + "|" + s.title, s]));
-  loaded.forEach(s => byNr.set(s.nr + "|" + s.title, s));
-  songs = [...byNr.values()].sort((a, b) => a.nr - b.nr || a.title.localeCompare(b.title));
-  save();
+  let restored = 0;
+  for (const f of files) {
+    const text = await f.text();
+    let backup = null;
+    try { backup = JSON.parse(text); } catch (err) {}
+    if (backup && backup.app === "buehne") { importBackup(backup); restored++; }
+    else loaded.push(parse(f.name, text));
+  }
+  if (loaded.length) mergeSongs(loaded);
   renderList();
-  $("hint").textContent = files.length + " Datei(en) geladen.";
+  $("hint").textContent = [loaded.length ? loaded.length + " Song(s) geladen." : "",
+                           restored ? "Sicherung geladen." : ""].filter(Boolean).join(" ");
   e.target.value = "";
+};
+function importBackup(b) {
+  if (Array.isArray(b.songs)) mergeSongs(b.songs);
+  for (const [k, v] of Object.entries((b.data && b.data.songs) || {})) {
+    if (!data.songs[k] || (v.updated || 0) >= (data.songs[k].updated || 0)) data.songs[k] = v;   // neuere Fassung gewinnt
+  }
+  saveData();
+}
+
+// ---------- Sichern ----------
+$("backup").onclick = async () => {
+  const day = new Date().toISOString().slice(0, 10);
+  const name = "buehne-" + day + ".json";
+  const out = JSON.parse(JSON.stringify(data));      // Akkordnamen mitschreiben, damit sie am Mac lesbar sind
+  for (const d of Object.values(out.songs))
+    (d.chords || []).forEach(c => c.label = c.auto ? nameChord(c.frets, (TUNINGS[d.tuning] || TUNINGS.std)[1]) : c.name);
+  const json = JSON.stringify({ app: "buehne", v: 1, saved: new Date().toISOString(), songs, data: out });
+  const file = new File([json], name, { type: "application/json" });
+  try {
+    if (navigator.canShare && navigator.canShare({ files: [file] })) { await navigator.share({ files: [file] }); return; }
+  } catch (e) { if (e.name === "AbortError") return; }
+  showText("Sicherung " + day, json, name);
+};
+
+// ---------- Textfenster (Sicherung, Tab als Text) ----------
+let tbName = "";
+function showText(title, text, fileName) {
+  $("tbTitle").textContent = title; $("tbText").value = text; tbName = fileName;
+  $("textbox").classList.add("open");
+}
+$("tbClose").onclick = () => $("textbox").classList.remove("open");
+$("tbCopy").onclick = async () => {
+  const t = $("tbText");
+  try { await navigator.clipboard.writeText(t.value); $("tbCopy").textContent = "Kopiert ✓"; }
+  catch (e) { t.removeAttribute("readonly"); t.focus(); t.select(); t.setAttribute("readonly", ""); }
+  setTimeout(() => $("tbCopy").textContent = "Kopieren", 1500);
+};
+$("tbSave").onclick = () => {
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([$("tbText").value], { type: "application/octet-stream" }));
+  a.download = tbName; document.body.appendChild(a); a.click(); a.remove();
+};
+
+// ---------- Musik ----------
+const NOTE = ["C", "C#", "D", "Eb", "E", "F", "F#", "G", "Ab", "A", "Bb", "B"];
+const TUNINGS = {
+  std:   ["Standard (E A D G B E)", [40, 45, 50, 55, 59, 64]],
+  dropd: ["Drop D (D A D G B E)",   [38, 45, 50, 55, 59, 64]],
+  eb:    ["Halbton tiefer (Eb)",    [39, 44, 49, 54, 58, 63]],
+  d:     ["Ganzton tiefer (D)",     [38, 43, 48, 53, 57, 62]],
+  dadgad:["DADGAD",                 [38, 45, 50, 55, 57, 62]],
+  openg: ["Open G (D G D G B D)",   [38, 43, 50, 55, 59, 62]],
+  bass6: ["Bass VI (E A D G B E, Oktave tiefer)", [28, 33, 38, 43, 47, 52]],
+};
+const GUITARS = ["SG", "Charger", "SixGun", "Firebird", "Sheraton", "Tele", "Bass VI"];
+const tuning = () => (TUNINGS[ud().tuning] || TUNINGS.std)[1];
+function stringNames(t) {
+  const n = t.map(m => NOTE[m % 12]);
+  if (n[5] === n[0]) n[5] = n[5].toLowerCase();
+  return n;
+}
+
+// Akkordname aus den gegriffenen Tönen: alle Grundtöne durchprobieren, einfachster Name gewinnt
+const CHORDS = [
+  ["", [0,4,7]], ["m", [0,3,7]], ["5", [0,7]], ["dim", [0,3,6]], ["aug", [0,4,8]], ["sus2", [0,2,7]], ["sus4", [0,5,7]],
+  ["7", [0,4,7,10]], ["maj7", [0,4,7,11]], ["m7", [0,3,7,10]], ["m7b5", [0,3,6,10]], ["dim7", [0,3,6,9]],
+  ["6", [0,4,7,9]], ["m6", [0,3,7,9]], ["add9", [0,2,4,7]], ["madd9", [0,2,3,7]], ["7sus4", [0,5,7,10]],
+  ["m(maj7)", [0,3,7,11]], ["add11", [0,4,5,7]], ["madd11", [0,3,5,7]], ["9", [0,2,4,7,10]], ["maj9", [0,2,4,7,11]],
+  ["m9", [0,2,3,7,10]], ["6/9", [0,2,4,7,9]], ["7b9", [0,1,4,7,10]], ["7#9", [0,3,4,7,10]], ["7b5", [0,4,6,10]],
+  ["aug7", [0,4,8,10]], ["maj7#11", [0,4,6,7,11]], ["11", [0,2,5,7,10]], ["m11", [0,2,3,5,7,10]], ["13", [0,2,4,7,9,10]],
+].map(([suffix, ints], i) => ({ suffix, i, mask: ints.reduce((m, n) => m | 1 << n, 0), fifth: ints.includes(7) && ints.length >= 4 }));
+function chordNotes(frets, t) {
+  return frets.map((f, s) => typeof f === "number" ? (t[s] + f) % 12 : null).filter(p => p !== null);
+}
+function nameChord(frets, t) {
+  const pcs = chordNotes(frets, t);
+  if (!pcs.length) return "";
+  const bass = pcs[0], set = [...new Set(pcs)];
+  if (set.length === 1) return NOTE[bass];
+  let best = null;
+  for (const root of set) {
+    const variants = [[set, 0]];
+    if (root !== bass && set.length > 2) variants.push([set.filter(p => p !== bass), 3]);   // Bass nur als Slash
+    for (const [notes, slashCost] of variants) {
+      const mask = notes.reduce((m, p) => m | 1 << ((p - root + 12) % 12), 0);
+      for (const c of CHORDS) {
+        let cost = null;
+        if (c.mask === mask) cost = 0;
+        else if (c.fifth && (c.mask & ~(1 << 7)) === mask) cost = 6;                     // ohne Quinte
+        if (cost === null) continue;
+        cost += c.i * 0.3 + (root !== bass ? 4 + slashCost : 0);
+        if (!best || cost < best.cost) best = { cost, name: NOTE[root] + c.suffix + (root !== bass ? "/" + NOTE[bass] : "") };
+      }
+    }
+  }
+  return best ? best.name : "";
+}
+const chordName = (c) => c.auto ? nameChord(c.frets, tuning()) : c.name;
+function autoBase(frets) {
+  const f = frets.filter(n => typeof n === "number" && n > 0);
+  return !f.length || Math.max(...f) <= 5 ? 1 : Math.min(...f);
+}
+const baseOf = (c) => c.base || autoBase(c.frets);
+
+// ---------- Griffbild (SVG) ----------
+const svgEsc = (t) => String(t).replace(/[&<>"]/g, c => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;" }[c]));
+function chordSVG(c, interactive) {
+  const X0 = 40, DX = 44, Y0 = 34, DY = 56, FR = 5, CY = Y0 + DY * FR + 46, R = 18;
+  const base = baseOf(c), x = (s) => X0 + s * DX;
+  let g = "";
+  g += base === 1 ? `<rect x="${X0 - 2}" y="${Y0 - 9}" width="${DX * 5 + 4}" height="10" fill="var(--fg)"/>`
+                  : `<line x1="${X0}" y1="${Y0}" x2="${X0 + DX * 5}" y2="${Y0}" stroke="var(--fg)" stroke-width="1.5"/>
+                     <text x="${X0 - 10}" y="${Y0 + DY / 2 + 9}" text-anchor="end" font-size="26" font-weight="600" fill="var(--fg)">${base}</text>`;
+  for (let r = 1; r <= FR; r++) g += `<line x1="${X0}" y1="${Y0 + r * DY}" x2="${X0 + DX * 5}" y2="${Y0 + r * DY}" stroke="var(--fg)" stroke-width="1.5"/>`;
+  c.frets.forEach((f, s) => {
+    const muted = f === "x";
+    g += `<line x1="${x(s)}" y1="${Y0}" x2="${x(s)}" y2="${CY - R}" stroke="${muted ? "var(--string)" : "var(--fg)"}" stroke-width="1.5"/>`;
+    if (typeof f === "number" && f >= base && f < base + FR)
+      g += `<circle cx="${x(s)}" cy="${Y0 + (f - base) * DY + DY / 2}" r="16" fill="var(--fg)"/>`;
+    g += `<g ${interactive ? `data-pick="${s}" style="cursor:pointer"` : ""}>
+            <circle cx="${x(s)}" cy="${CY}" r="${R}" fill="${muted ? "var(--mute)" : "var(--bg)"}" stroke="${muted ? "var(--mute)" : "var(--fg)"}" stroke-width="1.5"/>
+            <text x="${x(s)}" y="${CY + 7}" text-anchor="middle" font-size="19" fill="#fff">${muted ? "X" : f}</text></g>`;
+  });
+  if (interactive)   // Bundfelder antippen
+    for (let s = 0; s < 6; s++) for (let r = 0; r < FR; r++)
+      g += `<rect data-s="${s}" data-f="${base + r}" x="${x(s) - DX / 2}" y="${Y0 + r * DY}" width="${DX}" height="${DY}" fill="transparent" style="cursor:pointer"/>`;
+  return `<svg viewBox="0 0 ${X0 * 2 + DX * 5} ${CY + R + 6}" xmlns="http://www.w3.org/2000/svg" font-family="-apple-system,Helvetica,sans-serif">${g}</svg>`;
+}
+
+// ---------- Bund-Auswahl ----------
+let pickCb = null;
+function pick(title, values, cur, cb) {
+  const lab = (v) => v === null ? "leer" : v === "x" ? "X" : v;
+  $("picker").querySelector("h3").textContent = title;
+  $("picker").querySelector(".pgrid").innerHTML = values.map((v, i) =>
+    `<button data-i="${i}" class="${v === cur ? "on" : ""} ${v === "x" ? "x" : ""} ${v === null ? "wide" : ""}">${lab(v)}</button>`).join("");
+  pickCb = (i) => cb(values[i]);
+  $("picker").classList.add("open");
+}
+const FRETS = Array.from({ length: 25 }, (_, i) => i);
+$("picker").onclick = (e) => {
+  const b = e.target.closest("button");
+  if (b) pickCb(+b.dataset.i);
+  if (b || e.target === e.currentTarget) $("picker").classList.remove("open");
 };
 
 // ---------- Anzeige ----------
-function esc(t) { return t.replace(/[&<>]/g, c => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;" }[c])); }
+function esc(t) { return String(t).replace(/[&<>"]/g, c => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;" }[c])); }
 function renderList() {
   $("songs").innerHTML = songs.map((s, i) =>
     `<a href="#" data-i="${i}" class="${i === current ? "active" : ""}"><span>${s.nr || ""}</span>${esc(s.title)}</a>`).join("");
-  $("hint").textContent = songs.length ? "" :
-    "Noch keine Songs. Tippe auf „Songs laden …“ und wähle die Textdateien aus Google Drive (MC8Pro/Songtexte).";
+  if (!songs.length) $("hint").textContent =
+    "Noch keine Songs. Tippe auf „Laden …“ und wähle die Textdateien aus Google Drive (MC8Pro/Songtexte).";
 }
+function setPage(p) {
+  page = p;
+  document.body.dataset.page = p;
+  document.querySelectorAll("#pages button").forEach(b => b.classList.toggle("on", b.dataset.p === p));
+  if (current === null) return;
+  if (p === "info") renderInfo();
+  if (p === "chords") renderChords();
+  if (p === "tabs") renderTabs();
+  window.scrollTo(0, 0);
+}
+$("pages").onclick = (e) => { const b = e.target.closest("button"); if (b) setPage(b.dataset.p); };
+
+// TEXT
 function renderSong() {
   const s = songs[current];
   if (!s) return;
   $("title").textContent = s.title;
   $("meta").textContent = [s.key, s.tempo ? s.tempo + " BPM" : ""].filter(Boolean).join(" · ");
-  $("main").innerHTML = s.sections.length ? s.sections.map((sec, i) =>
+  $("pText").innerHTML = s.sections.length ? s.sections.map((sec, i) =>
     `<section data-i="${i}">${sec.label ? `<div class="label">${esc(sec.label)}</div>` : ""}<p>${esc(sec.lines.join("\n"))}</p></section>`).join("")
     : `<p class="note">Kein Text vorhanden.</p>`;
   highlight(false);
-  window.scrollTo(0, 0);
 }
 function highlight(scroll = true) {
-  document.querySelectorAll("section").forEach(el => {
+  document.querySelectorAll("#pText section").forEach(el => {
     const on = +el.dataset.i === section;
     el.classList.toggle("current", on);
-    if (on && scroll) el.scrollIntoView({ behavior: "smooth", block: "start" });
+    if (on && scroll && page === "text") el.scrollIntoView({ behavior: "smooth", block: "start" });
   });
 }
 function openSong(i) {
   if (i < 0 || i >= songs.length) return;
   current = i; section = 0;
   document.body.classList.remove("listing");
-  renderSong(); renderList();
+  ["editor", "picker", "textbox"].forEach(id => $(id).classList.remove("open"));
+  renderSong(); renderList(); setPage("text");   // Songwechsel landet immer beim Text
 }
 function openSongNr(nr) {
   const i = songs.findIndex(s => s.nr === nr);
@@ -168,9 +469,189 @@ function scene(n) {
   highlight();
 }
 
+// INFO
+function renderInfo() {
+  const s = songs[current], u = ud();
+  const facts = [["Tonart", s.key], ["Tempo", s.tempo && s.tempo + " BPM"], ...s.info,
+                 ...s.scenes.map((sc, i) => ["Szene " + "ABCD"[i], sc])].filter(f => f[1]);
+  $("pInfo").innerHTML = `
+    ${facts.length ? `<div class="facts">${facts.map(([k, v]) => `<div class="fact"><span class="cap">${esc(k)}</span><div>${esc(v)}</div></div>`).join("")}</div>` : ""}
+    <div class="field"><span class="cap">Gitarre</span><div class="chips" id="inGuitar">
+      ${GUITARS.map(g => `<button class="chip ${u.guitar === g ? "on" : ""}" data-g="${esc(g)}">${esc(g)}</button>`).join("")}</div></div>
+    <div class="field"><span class="cap">Stimmung</span><select id="inTuning">
+      ${Object.entries(TUNINGS).map(([k, [lab]]) => `<option value="${k}" ${u.tuning === k ? "selected" : ""}>${esc(lab)}</option>`).join("")}</select></div>
+    <div class="field"><span class="cap">Capo</span><div class="stepper">
+      <button data-capo="-1">−</button><b>${u.capo || "–"}</b><button data-capo="1">+</button></div></div>
+    <div class="field"><span class="cap">Notizen</span><textarea id="inNotes" placeholder="Hinweise, Einsätze, Sounds …">${esc(u.notes)}</textarea></div>`;
+}
+$("pInfo").addEventListener("click", (e) => {
+  const u = ud(), g = e.target.closest("[data-g]"), c = e.target.closest("[data-capo]");
+  if (g) {
+    u.guitar = u.guitar === g.dataset.g ? "" : g.dataset.g;
+    if (u.guitar === "Bass VI" && u.tuning === "std") u.tuning = "bass6";       // Bass VI bringt seine Stimmung mit
+    else if (u.guitar !== "Bass VI" && u.tuning === "bass6") u.tuning = "std";
+  } else if (c) u.capo = Math.max(0, Math.min(12, (u.capo || 0) + +c.dataset.capo));
+  else return;
+  touch(); renderInfo();
+});
+$("pInfo").addEventListener("change", (e) => { if (e.target.id === "inTuning") { ud().tuning = e.target.value; touch(); } });
+$("pInfo").addEventListener("input", (e) => { if (e.target.id === "inNotes") { ud().notes = e.target.value; touch(); } });
+
+// GRIFFE
+function renderChords() {
+  const u = ud();
+  $("pChords").innerHTML = (u.chords.length ? "" : `<p class="empty">Noch keine Griffe für diesen Song.</p>`) +
+    `<div class="cgrid">${u.chords.map((c, i) =>
+      `<div class="ccard" data-i="${i}"><div class="nm">${esc(chordName(c))}</div>${chordSVG(c, false)}</div>`).join("")}
+     <button class="ccard add" id="addChord">+ Griff</button></div>`;
+}
+$("pChords").onclick = (e) => {
+  const u = ud();
+  if (e.target.closest("#addChord")) {
+    u.chords.push({ name: "", auto: true, frets: [0, 0, 0, 0, 0, 0], base: null });
+    touch(); renderChords(); openEditor(u.chords.length - 1); return;
+  }
+  const card = e.target.closest(".ccard");
+  if (card) openEditor(+card.dataset.i);
+};
+
+let edIdx = 0;
+function openEditor(i) { edIdx = i; renderEditor(); $("editor").classList.add("open"); }
+function renderEditor() {
+  const u = ud(), c = u.chords[edIdx], t = tuning();
+  const notes = [...new Set(chordNotes(c.frets, t))].map(p => NOTE[p]).join(" ");
+  const suggestion = nameChord(c.frets, t);
+  $("editor").querySelector(".box").innerHTML = `
+    <div id="edDiagram">${chordSVG(c, true)}</div>
+    <div class="side">
+      <div><span class="cap">Name</span><input id="edName" value="${esc(chordName(c))}" placeholder="${esc(suggestion || "Name")}" autocomplete="off" autocapitalize="off"></div>
+      <div class="hint">${notes ? "Töne: " + notes : "Kreise unten antippen, um den Bund zu wählen."}
+        ${!c.auto && suggestion && suggestion !== c.name ? `<br><button id="edAuto" style="margin-top:8px">Vorschlag: ${esc(suggestion)}</button>` : ""}</div>
+      <div><span class="cap">Lage (erster Bund im Bild)</span><div class="stepper">
+        <button data-base="-1">−</button><b>${baseOf(c)}</b><button data-base="1">+</button>
+        ${c.base ? `<button data-base="0">automatisch</button>` : ""}</div></div>
+      <div class="btns"><button data-move="-1">◀ nach vorn</button><button data-move="1">nach hinten ▶</button>
+        <button id="edDup">Duplizieren</button><button class="danger" id="edDel">Löschen</button></div>
+      <div class="btns"><span class="grow"></span><button class="primary" id="edDone">Fertig</button></div>
+    </div>`;
+}
+function setFret(s, f) {
+  const c = ud().chords[edIdx];
+  c.frets[s] = f;
+  if (c.base && typeof f === "number" && f > 0 && (f < c.base || f > c.base + 4)) c.base = null;   // Lage folgt dem Griff
+  touch(); renderEditor();
+}
+$("editor").onclick = (e) => {
+  if (e.target === e.currentTarget) { closeEditor(); return; }
+  const u = ud(), c = u.chords[edIdx], t = tuning(), names = stringNames(t);
+  const cell = e.target.closest("[data-s]"), circ = e.target.closest("[data-pick]");
+  if (cell) { const s = +cell.dataset.s, f = +cell.dataset.f; setFret(s, c.frets[s] === f ? 0 : f); return; }
+  if (circ) { const s = +circ.dataset.pick; pick("Saite " + names[s] + " – Bund", ["x", ...FRETS], c.frets[s], (v) => setFret(s, v)); return; }
+  const b = e.target.closest("button");
+  if (!b) return;
+  if (b.dataset.base !== undefined) {
+    const d = +b.dataset.base;
+    c.base = d === 0 ? null : Math.max(1, Math.min(20, baseOf(c) + d));
+  } else if (b.dataset.move) {
+    const j = edIdx + +b.dataset.move;
+    if (j < 0 || j >= u.chords.length) return;
+    [u.chords[edIdx], u.chords[j]] = [u.chords[j], u.chords[edIdx]]; edIdx = j;
+  } else if (b.id === "edAuto") { c.auto = true; c.name = ""; }
+  else if (b.id === "edDup") { u.chords.splice(edIdx + 1, 0, JSON.parse(JSON.stringify(c))); edIdx++; }
+  else if (b.id === "edDel") {
+    if (!b.classList.contains("armed")) { b.classList.add("armed"); b.textContent = "Wirklich löschen?"; return; }
+    u.chords.splice(edIdx, 1); touch(); closeEditor(); return;
+  } else if (b.id === "edDone") { closeEditor(); return; }
+  else return;
+  touch(); renderEditor();
+};
+$("editor").addEventListener("input", (e) => {
+  if (e.target.id !== "edName") return;
+  const c = ud().chords[edIdx], v = e.target.value.trim();
+  c.auto = !v; c.name = v; touch();
+});
+function closeEditor() { $("editor").classList.remove("open"); renderChords(); }
+
+// TABS
+let tabSel = {};   // gewählter Schritt pro Tab
+const emptyStep = () => ({ f: [null, null, null, null, null, null], bar: false });
+function renderTabs() {
+  const u = ud(), names = stringNames(tuning());
+  $("pTabs").innerHTML = (u.tabs.length ? "" : `<p class="empty">Noch keine Tabs für diesen Song.</p>`) +
+    u.tabs.map((tb, ti) => {
+      const sel = tabSel[ti] ?? -1;
+      const cols = tb.steps.map((st, si) => `
+        <div class="tcol ${si === sel ? "sel" : ""} ${st.bar ? "bar" : ""}" data-t="${ti}" data-step="${si}">
+          <div class="hd">${si + 1}</div><div class="cells">
+          ${[5, 4, 3, 2, 1, 0].map(s => `<div class="c" data-str="${s}">${st.f[s] === null ? "" :
+            `<span class="${st.f[s] === "x" ? "x" : ""}">${st.f[s] === "x" ? "X" : st.f[s]}</span>`}</div>`).join("")}</div></div>`).join("");
+      return `<div class="tabblock" data-t="${ti}">
+        <div class="tabhead"><input value="${esc(tb.title)}" data-title="${ti}" placeholder="Name (z. B. Intro-Riff)">
+          <button data-act="text">Als Text</button><button class="danger" data-act="del">Löschen</button></div>
+        <div class="staff"><div class="names"><div class="hd"></div>${[5, 4, 3, 2, 1, 0].map(s => `<div>${names[s]}</div>`).join("")}</div>${cols}</div>
+        <div class="tabtools">
+          <button data-act="add">+ Schritt</button>
+          <button data-act="ins" ${sel < 0 ? "disabled" : ""}>+ davor</button>
+          <button data-act="bar" ${sel < 0 ? "disabled" : ""}>Taktstrich danach</button>
+          <button data-act="clear" ${sel < 0 ? "disabled" : ""}>Schritt leeren</button>
+          <button data-act="rm" ${sel < 0 ? "disabled" : ""}>Schritt löschen</button>
+        </div></div>`;
+    }).join("") + `<button id="addTab">+ Tab</button>`;
+}
+$("pTabs").onclick = (e) => {
+  const u = ud();
+  if (e.target.closest("#addTab")) {
+    u.tabs.push({ title: "", steps: Array.from({ length: 16 }, emptyStep) });
+    touch(); renderTabs(); return;
+  }
+  const col = e.target.closest(".tcol");
+  if (col) {
+    const ti = +col.dataset.t, si = +col.dataset.step, c = e.target.closest(".c");
+    tabSel[ti] = si;
+    if (c) {
+      const s = +c.dataset.str, step = u.tabs[ti].steps[si];
+      pick("Schritt " + (si + 1) + " · Saite " + stringNames(tuning())[s], [null, "x", ...FRETS], step.f[s], (v) => {
+        step.f[s] = v; touch(); renderTabs();
+      });
+    }
+    renderTabs(); return;
+  }
+  const b = e.target.closest("button[data-act]");
+  if (!b) return;
+  const ti = +b.closest(".tabblock").dataset.t, tb = u.tabs[ti], sel = tabSel[ti] ?? -1;
+  switch (b.dataset.act) {
+    case "add": tb.steps.splice(sel < 0 ? tb.steps.length : sel + 1, 0, emptyStep()); tabSel[ti] = sel < 0 ? tb.steps.length - 1 : sel + 1; break;
+    case "ins": tb.steps.splice(sel, 0, emptyStep()); break;
+    case "bar": tb.steps[sel].bar = !tb.steps[sel].bar; break;
+    case "clear": tb.steps[sel] = Object.assign(emptyStep(), { bar: tb.steps[sel].bar }); break;
+    case "rm": tb.steps.splice(sel, 1); if (!tb.steps.length) tb.steps.push(emptyStep());
+               tabSel[ti] = Math.min(sel, tb.steps.length - 1); break;
+    case "text": showText(tb.title || "Tab", tabText(tb), (tb.title || "tab").replace(/[^\w-]+/g, "_") + ".txt"); return;
+    case "del":
+      if (!b.classList.contains("armed")) { b.classList.add("armed"); b.textContent = "Wirklich löschen?"; return; }
+      u.tabs.splice(ti, 1); tabSel = {}; break;
+  }
+  touch(); renderTabs();
+};
+$("pTabs").addEventListener("input", (e) => {
+  const t = e.target.dataset.title;
+  if (t !== undefined) { ud().tabs[+t].title = e.target.value; touch(); }
+});
+function tabText(tb) {
+  const names = stringNames(tuning());
+  const w = tb.steps.map(st => Math.max(1, ...st.f.map(v => v === null ? 1 : String(v).length)));
+  return [5, 4, 3, 2, 1, 0].map(s => names[s].padEnd(2) + "|-" + tb.steps.map((st, i) => {
+    const v = st.f[s] === null ? "" : st.f[s] === "x" ? "x" : String(st.f[s]);
+    return v.padEnd(w[i], "-") + "-" + (st.bar ? "|-" : "");
+  }).join("") + "|").join("\n");
+}
+
 $("songs").onclick = (e) => { const a = e.target.closest("a"); if (!a) return; e.preventDefault(); openSong(+a.dataset.i); };
-$("main").onclick = (e) => { const el = e.target.closest("section"); if (el) { section = +el.dataset.i; highlight(); } };
-$("toggleList").onclick = () => { document.body.classList.toggle("listing"); renderList(); };
+$("pText").onclick = (e) => { const el = e.target.closest("section"); if (el) { section = +el.dataset.i; highlight(); } };
+$("toggleList").onclick = () => {
+  if (current === null) return;
+  document.body.classList.toggle("listing"); renderList();
+};
 function fontSize(d) {
   const size = Math.max(18, Math.min(80, (+setting("stage-size") || 34) + d));
   document.documentElement.style.setProperty("--size", size + "px");
@@ -226,7 +707,7 @@ async function midi() {
 async function keepAwake() { try { if ("wakeLock" in navigator) await navigator.wakeLock.request("screen"); } catch (e) {} }
 document.addEventListener("visibilitychange", () => { if (!document.hidden) keepAwake(); });
 
-restore(); fontSize(0); renderList(); midi(); keepAwake();
+restore(); fontSize(0); renderList(); setPage("text"); midi(); keepAwake();
 </script>
 </body>
 </html>
