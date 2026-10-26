@@ -203,6 +203,7 @@ function saveData() {
 }
 function restore() {
   try { songs = JSON.parse(localStorage.getItem(STORE) || "[]"); } catch (e) { songs = []; }
+  songs.forEach(s => { s.info = s.info || []; s.scenes = s.scenes || []; s.sections = s.sections || []; });   // ältere App-Versionen
   try { data = JSON.parse(localStorage.getItem(DATA) || "") || data; } catch (e) {}
   if (!data.songs) data.songs = {};
   try { navigator.storage && navigator.storage.persist && navigator.storage.persist(); } catch (e) {}
@@ -498,7 +499,7 @@ function renderInfo() {
     <div class="facts">
       ${own.map(([lab, k, fileVal]) => `<label class="fact"><span class="cap">${lab}</span>
         <input data-own="${k}" value="${esc(val(k, fileVal))}" placeholder="–" autocomplete="off"></label>`).join("")}
-      ${s.info.map(([k, v]) => `<div class="fact"><span class="cap">${esc(k)}</span><div>${esc(v)}</div></div>`).join("")}
+      ${(s.info || []).map(([k, v]) => `<div class="fact"><span class="cap">${esc(k)}</span><div>${esc(v)}</div></div>`).join("")}
       ${(u.fields || []).map((f, i) => `<div class="fact"><input class="k" data-fk="${i}" value="${esc(f.k)}" placeholder="Feld" autocomplete="off">
         <input data-fv="${i}" value="${esc(f.v)}" placeholder="–" autocomplete="off"></div>`).join("")}
       <button class="fact add" id="addField">+ Feld</button>
