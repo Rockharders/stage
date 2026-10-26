@@ -1,0 +1,213 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>Bühne</title>
+<style>
+  :root { --bg:#0b0b0c; --fg:#f2f2f2; --dim:#6e6e74; --line:#232326; --accent:#c6ff3d; --warn:#ff6b5e; --size:34px; }
+  * { box-sizing:border-box; }
+  html, body { margin:0; background:var(--bg); color:var(--fg);
+    font:400 var(--size)/1.35 -apple-system,"Helvetica Neue",sans-serif; -webkit-text-size-adjust:100%; }
+  header { position:sticky; top:0; z-index:2; display:flex; align-items:center; gap:14px;
+    padding:calc(env(safe-area-inset-top) + 10px) 20px 10px; background:var(--bg); border-bottom:1px solid var(--line); font-size:17px; }
+  header h1 { flex:1; margin:0; font-size:24px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .meta { color:var(--dim); white-space:nowrap; }
+  .midi { display:flex; align-items:center; gap:6px; color:var(--dim); white-space:nowrap; }
+  .dot { width:10px; height:10px; border-radius:50%; background:var(--warn); }
+  .dot.on { background:var(--accent); }
+  button { font:inherit; font-size:17px; color:var(--fg); background:#1b1b1e; border:1px solid var(--line);
+    border-radius:10px; padding:8px 14px; }
+  main { padding:20px 20px 60vh; }
+  section { padding:12px 16px; margin:0 0 10px; border-left:4px solid transparent; color:var(--dim);
+    transition:color .2s, background .2s; }
+  section.current { color:var(--fg); border-left-color:var(--accent); background:#141416; }
+  .label { font-size:14px; letter-spacing:.12em; text-transform:uppercase; color:var(--accent); margin-bottom:6px; }
+  section p { margin:0; white-space:pre-wrap; }
+  .note { color:var(--dim); font-style:italic; }
+  #list { display:none; padding:calc(env(safe-area-inset-top) + 16px) 20px 40px; }
+  body.listing #list { display:block; }
+  body.listing main { display:none; }
+  #list a { display:flex; gap:16px; padding:14px 0; border-bottom:1px solid var(--line); color:var(--fg);
+    text-decoration:none; font-size:24px; }
+  #list a span { color:var(--dim); min-width:2em; }
+  #list a.active { color:var(--accent); }
+  .tools { display:flex; flex-wrap:wrap; gap:10px; margin:0 0 18px; }
+  .hint { color:var(--dim); font-size:17px; line-height:1.5; }
+  input[type=file] { display:none; }
+</style>
+</head>
+<body class="listing">
+<header>
+  <div class="midi"><div class="dot" id="dot"></div><span id="midiText">MIDI</span></div>
+  <h1 id="title">Songs</h1>
+  <span class="meta" id="meta"></span>
+  <button id="smaller" aria-label="Schrift kleiner">A−</button>
+  <button id="bigger" aria-label="Schrift größer">A+</button>
+  <button id="toggleList">Songs</button>
+</header>
+<nav id="list">
+  <div class="tools">
+    <button id="load">Songs laden …</button>
+    <input type="file" id="file" multiple>
+  </div>
+  <div id="songs"></div>
+  <p class="hint" id="hint"></p>
+</nav>
+<main id="main"></main>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const STORE = "stage-songs-v1";
+const CH = 16, SCENE_CC = 20;
+let songs = [];      // {nr, title, tempo, key, scenes[], sections[{label, lines[]}]}
+let current = null;  // index in songs
+let section = 0;
+
+// ---------- Speicher ----------
+function save() { try { localStorage.setItem(STORE, JSON.stringify(songs)); } catch (e) {} }
+function restore() {
+  try { songs = JSON.parse(localStorage.getItem(STORE) || "[]"); } catch (e) { songs = []; }
+}
+function setting(key, value) {
+  try { if (value === undefined) return localStorage.getItem(key); localStorage.setItem(key, value); } catch (e) {}
+}
+
+// ---------- ChordPro / Text einlesen ----------
+const KIND = { start_of_verse:1, sov:1, start_of_chorus:1, soc:1, start_of_bridge:1, sob:1, start_of_part:1 };
+function parse(name, text) {
+  const nrMatch = name.match(/^(\d+)/);
+  const song = { nr: nrMatch ? parseInt(nrMatch[1], 10) : 0, title: name.replace(/^\d+[_ -]*/, "").replace(/\.[^.]+$/, ""),
+                 tempo: "", key: "", scenes: [], sections: [] };
+  let sec = null;
+  const open = (label) => { sec = { label, lines: [] }; song.sections.push(sec); };
+  for (const raw of text.replace(/\r/g, "").split("\n")) {
+    const line = raw.replace(/\s+$/, "");
+    const dir = line.match(/^\s*\{\s*([a-z_]+)\s*(?::\s*(.*?))?\s*\}\s*$/i);
+    if (dir) {
+      const k = dir[1].toLowerCase(), v = dir[2] || "";
+      if (k === "title" || k === "t") song.title = v;
+      else if (k === "tempo") song.tempo = v;
+      else if (k === "key") song.key = v;
+      else if (k === "meta" && v.startsWith("mc8scenes")) song.scenes = v.replace("mc8scenes", "").trim().split("|");
+      else if (KIND[k]) open(v || k.replace(/^start_of_|^so/, "").replace("v", "verse").replace("c", "chorus").replace("b", "bridge"));
+      else if (k.startsWith("end_of") || ["eov", "eoc", "eob"].includes(k)) sec = null;
+      else if ((k === "comment" || k === "c") && !/^MC8 Song/.test(v)) open(v);
+      continue;
+    }
+    const tag = line.match(/^\s*\[([^\]]+)\]\s*$/);       // [Verse] im Klartext-Format
+    if (tag && !/^[A-G][#b]?(m|maj|min|sus|dim|aug|\d)*$/.test(tag[1])) { open(tag[1]); continue; }
+    if (!sec) { if (!line.trim()) continue; open(""); }
+    sec.lines.push(line.replace(/\[[^\]]*\]/g, ""));    // Akkorde in [ ] ausblenden
+  }
+  song.sections.forEach(s => { while (s.lines.length && !s.lines[s.lines.length - 1].trim()) s.lines.pop(); });
+  song.sections = song.sections.filter(s => s.label || s.lines.some(l => l.trim()));
+  return song;
+}
+
+$("load").onclick = () => $("file").click();
+$("file").onchange = async (e) => {
+  const files = [...e.target.files];
+  if (!files.length) return;
+  const loaded = [];
+  for (const f of files) loaded.push(parse(f.name, await f.text()));
+  const byNr = new Map(songs.map(s => [s.nr + "|" + s.title, s]));
+  loaded.forEach(s => byNr.set(s.nr + "|" + s.title, s));
+  songs = [...byNr.values()].sort((a, b) => a.nr - b.nr || a.title.localeCompare(b.title));
+  save();
+  renderList();
+  $("hint").textContent = files.length + " Datei(en) geladen.";
+  e.target.value = "";
+};
+
+// ---------- Anzeige ----------
+function esc(t) { return t.replace(/[&<>]/g, c => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;" }[c])); }
+function renderList() {
+  $("songs").innerHTML = songs.map((s, i) =>
+    `<a href="#" data-i="${i}" class="${i === current ? "active" : ""}"><span>${s.nr || ""}</span>${esc(s.title)}</a>`).join("");
+  $("hint").textContent = songs.length ? "" :
+    "Noch keine Songs. Tippe auf „Songs laden …“ und wähle die Textdateien aus Google Drive (MC8Pro/Songtexte).";
+}
+function renderSong() {
+  const s = songs[current];
+  if (!s) return;
+  $("title").textContent = s.title;
+  $("meta").textContent = [s.key, s.tempo ? s.tempo + " BPM" : ""].filter(Boolean).join(" · ");
+  $("main").innerHTML = s.sections.length ? s.sections.map((sec, i) =>
+    `<section data-i="${i}">${sec.label ? `<div class="label">${esc(sec.label)}</div>` : ""}<p>${esc(sec.lines.join("\n"))}</p></section>`).join("")
+    : `<p class="note">Kein Text vorhanden.</p>`;
+  highlight(false);
+  window.scrollTo(0, 0);
+}
+function highlight(scroll = true) {
+  document.querySelectorAll("section").forEach(el => {
+    const on = +el.dataset.i === section;
+    el.classList.toggle("current", on);
+    if (on && scroll) el.scrollIntoView({ behavior: "smooth", block: "start" });
+  });
+}
+function openSong(i) {
+  if (i < 0 || i >= songs.length) return;
+  current = i; section = 0;
+  document.body.classList.remove("listing");
+  renderSong(); renderList();
+}
+function openSongNr(nr) {
+  const i = songs.findIndex(s => s.nr === nr);
+  if (i >= 0) openSong(i);
+}
+function scene(n) {
+  const s = songs[current];
+  if (!s || !s.scenes[n]) return;
+  const want = s.scenes[n].toLowerCase();
+  for (let step = 1; step <= s.sections.length; step++) {
+    const i = (section + step) % s.sections.length;
+    if (s.sections[i].label.toLowerCase().startsWith(want)) { section = i; break; }
+  }
+  highlight();
+}
+
+$("songs").onclick = (e) => { const a = e.target.closest("a"); if (!a) return; e.preventDefault(); openSong(+a.dataset.i); };
+$("main").onclick = (e) => { const el = e.target.closest("section"); if (el) { section = +el.dataset.i; highlight(); } };
+$("toggleList").onclick = () => { document.body.classList.toggle("listing"); renderList(); };
+function fontSize(d) {
+  const size = Math.max(18, Math.min(80, (+setting("stage-size") || 34) + d));
+  document.documentElement.style.setProperty("--size", size + "px");
+  setting("stage-size", String(size));
+}
+$("smaller").onclick = () => fontSize(-4);
+$("bigger").onclick = () => fontSize(4);
+
+// ---------- MIDI (MC8 Kanal 16) ----------
+function onMidi(ev) {
+  const [st, d1, d2] = ev.data;
+  if ((st & 0x0f) !== CH - 1) return;
+  if ((st & 0xf0) === 0xc0) openSongNr(d1);
+  else if ((st & 0xf0) === 0xb0 && d1 === SCENE_CC) scene(d2);
+}
+async function midi() {
+  if (!navigator.requestMIDIAccess) { $("midiText").textContent = "kein MIDI in diesem Browser"; return; }
+  try {
+    const access = await navigator.requestMIDIAccess();
+    const bind = () => {
+      let n = 0;
+      access.inputs.forEach(inp => { inp.onmidimessage = onMidi; n++; });
+      $("dot").classList.toggle("on", n > 0);
+      $("midiText").textContent = n ? [...access.inputs.values()].map(i => i.name).join(", ") : "kein MIDI-Gerät";
+    };
+    access.onstatechange = bind;
+    bind();
+  } catch (e) {
+    $("midiText").textContent = "MIDI nicht erlaubt: " + (e && (e.name || "") + " " + (e.message || "")) +
+      (window.isSecureContext ? "" : " (keine https-Adresse)");
+  }
+}
+
+async function keepAwake() { try { if ("wakeLock" in navigator) await navigator.wakeLock.request("screen"); } catch (e) {} }
+document.addEventListener("visibilitychange", () => { if (!document.hidden) keepAwake(); });
+
+restore(); fontSize(0); renderList(); midi(); keepAwake();
+</script>
+</body>
+</html>
