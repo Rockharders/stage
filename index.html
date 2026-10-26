@@ -180,8 +180,12 @@ $("smaller").onclick = () => fontSize(-4);
 $("bigger").onclick = () => fontSize(4);
 
 // ---------- MIDI (MC8 Kanal 16) ----------
+let lastMsg = "", lastAt = 0;
 function onMidi(ev) {
   const [st, d1, d2] = ev.data;
+  const key = st + "," + d1 + "," + d2, now = Date.now();
+  if (key === lastMsg && now - lastAt < 30) return;   // gleiches Ereignis doppelt gemeldet
+  lastMsg = key; lastAt = now;
   if ((st & 0x0f) !== CH - 1) return;
   if ((st & 0xf0) === 0xc0) openSongNr(d1);
   else if ((st & 0xf0) === 0xb0 && d1 === SCENE_CC) scene(d2);
@@ -190,13 +194,28 @@ async function midi() {
   if (!navigator.requestMIDIAccess) { $("midiText").textContent = "kein MIDI in diesem Browser"; return; }
   try {
     const access = await navigator.requestMIDIAccess();
-    const bind = () => {
-      let n = 0;
-      access.inputs.forEach(inp => { inp.onmidimessage = onMidi; n++; });
-      $("dot").classList.toggle("on", n > 0);
-      $("midiText").textContent = n ? [...access.inputs.values()].map(i => i.name).join(", ") : "kein MIDI-Gerät";
+    // Ältere Browser (z. B. Web MIDI Browser) liefern die Eingänge anders – alle Varianten abdecken
+    const inputs = () => {
+      let ins = access.inputs;
+      if (typeof ins === "function") ins = ins.call(access);
+      if (!ins) return [];
+      if (Array.isArray(ins)) return ins;
+      const out = [];
+      if (typeof ins.forEach === "function") ins.forEach(i => out.push(i));
+      else if (typeof ins.values === "function") for (const i of ins.values()) out.push(i);
+      return out;
     };
-    access.onstatechange = bind;
+    const bind = () => {
+      const list = inputs();
+      list.forEach(inp => {
+        inp.onmidimessage = onMidi;
+        if (typeof inp.addEventListener === "function") inp.addEventListener("midimessage", onMidi);
+      });
+      $("dot").classList.toggle("on", list.length > 0);
+      $("midiText").textContent = list.length ? list.map(i => i.name).join(", ") : "kein MIDI-Gerät";
+    };
+    try { access.onstatechange = bind; } catch (e) {}
+    setInterval(bind, 3000);                         // neu verbundene Geräte erkennen
     bind();
   } catch (e) {
     $("midiText").textContent = "MIDI nicht erlaubt: " + (e && (e.name || "") + " " + (e.message || "")) +
