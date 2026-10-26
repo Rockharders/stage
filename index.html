@@ -379,7 +379,7 @@ function chordSVG(c, interactive) {
   for (let r = 1; r <= FR; r++) g += `<line x1="${X0}" y1="${Y0 + r * DY}" x2="${X0 + DX * 5}" y2="${Y0 + r * DY}" stroke="var(--fg)" stroke-width="1.5"/>`;
   c.frets.forEach((f, s) => {
     const muted = f === "x";
-    g += `<line x1="${x(s)}" y1="${Y0}" x2="${x(s)}" y2="${CY - R}" stroke="${muted ? "var(--string)" : "var(--fg)"}" stroke-width="1.5"/>`;
+    g += `<line x1="${x(s)}" y1="${Y0}" x2="${x(s)}" y2="${CY - R}" stroke="${muted ? "var(--mute)" : "var(--fg)"}" stroke-width="${muted ? 2.5 : 1.5}"/>`;
     if (typeof f === "number" && f >= base && f < base + FR)
       g += `<circle cx="${x(s)}" cy="${Y0 + (f - base) * DY + DY / 2}" r="16" fill="var(--fg)"/>`;
     g += `<g ${interactive ? `data-pick="${s}" style="cursor:pointer"` : ""}>
