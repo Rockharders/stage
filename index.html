@@ -105,6 +105,16 @@
   .part .stepper b { min-width:0; font-size:18px; white-space:nowrap; }
   .part .stepper button, .part .mv button { padding:6px 12px; font-size:16px; }
   .part .mv { display:flex; gap:6px; }
+  .mapgrid .lab { cursor:pointer; display:flex; align-items:baseline; gap:10px; margin:18px 0 8px; font-size:20px; font-weight:700; }
+  .mapgrid .lab small { color:var(--dim); font-size:15px; font-weight:500; }
+  .mapgrid .lab .nt { color:var(--dim); font-size:15px; font-weight:400; }
+  .bars { display:grid; grid-template-columns:repeat(8, 1fr); gap:6px; }
+  @media (max-width:600px) { .bars { grid-template-columns:repeat(4, 1fr); } }
+  .bars div { position:relative; height:64px; border-radius:8px; border-top:4px solid; display:flex; align-items:center;
+    justify-content:center; font-size:20px; font-weight:600; }
+  .bars div small { position:absolute; left:7px; top:4px; font-size:11px; font-weight:500; color:var(--dim); }
+  .bars .again { grid-column:1 / -1; height:auto; border:0; justify-content:flex-start; font-size:12px; font-weight:500;
+    color:var(--dim); letter-spacing:.12em; text-transform:uppercase; margin:4px 0 0; }
 
   /* ---------- GRIFFE ---------- */
   .cgrid { display:grid; grid-template-columns:repeat(auto-fill, minmax(160px, 1fr)); gap:14px; }
@@ -776,12 +786,14 @@ function renderMap() {
   const bars = map.reduce((n, p) => n + p.bars * p.rep, 0), bpm = parseFloat(val("tempo", s.tempo));
   const secs = bpm ? Math.round(bars * beatsPerBar() * 60 / bpm) : 0;
   const fromText = s.sections.filter(x => x.label).length;
-  $("pMap").innerHTML = (map.length ? `
+  const grid = setting("stage-map-view") === "grid";
+  $("pMap").innerHTML = `<div class="tabmode"><div class="seg"><button data-view="list" class="${grid ? "" : "on"}">Liste</button>` +
+    `<button data-view="grid" class="${grid ? "on" : ""}">Raster</button></div></div>` + (map.length ? `
     <div class="mapbar">${map.map((p, i) => `<a href="#" data-goto="${i}" style="flex:${p.bars * p.rep};background:${partColor(p.name)}">
       ${esc(p.name || "–")}<small>${p.bars}${p.rep > 1 ? " × " + p.rep : ""}</small></a>`).join("")}</div>
     <p class="maptotal"><b>${bars} Takte</b>${secs ? ` · ≈ ${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, "0")} bei ${bpm} BPM` : ""}</p>` :
     `<p class="empty">Noch keine Songmap. Teile unten antippen – oder aus dem Songtext übernehmen.</p>`) +
-    map.map((p, i) => `<div class="part" id="part${i}" data-i="${i}"><div class="clr" style="background:${partColor(p.name)}"></div><div class="body">
+    (grid ? mapGrid(map) : map.map((p, i) => `<div class="part" id="part${i}" data-i="${i}"><div class="clr" style="background:${partColor(p.name)}"></div><div class="body">
       <div class="top">
         <input class="nm" data-k="name" value="${esc(p.name)}" placeholder="Teil" autocomplete="off">
         <span class="stepper"><button data-a="bars" data-d="-1">−</button><b>${p.bars} Takte</b><button data-a="bars" data-d="1">+</button></span>
@@ -789,17 +801,43 @@ function renderMap() {
         <span class="mv"><button data-a="up" ${i ? "" : "disabled"}>↑</button><button data-a="down" ${i < map.length - 1 ? "" : "disabled"}>↓</button>
           <button data-a="dup">Kopie</button><button class="danger" data-a="del">✕</button></span>
       </div>
-      <input class="ch" data-k="chords" value="${esc(p.chords)}" placeholder="Akkorde, z. B. Am F C G" autocomplete="off">
+      <input class="ch" data-k="chords" value="${esc(p.chords)}" placeholder="Akkorde je Takt, z. B. Am F C G  (- = Takt halten)" autocomplete="off">
       <input class="nt" data-k="note" value="${esc(p.note)}" placeholder="Hinweis, z. B. Szene B, nur Bass, Break auf 4" autocomplete="off">
     </div></div>`).join("") + `
     <div class="field" style="margin-top:22px"><span class="cap">Teil anhängen</span><div class="chips">
       ${PARTS.map(n => `<button class="chip" data-add="${n}">+ ${n}</button>`).join("")}
-      ${!map.length && fromText ? `<button class="chip" data-a="fromtext">Aus Songtext (${fromText} Teile)</button>` : ""}</div></div>`;
+      ${!map.length && fromText ? `<button class="chip" data-a="fromtext">Aus Songtext (${fromText} Teile)</button>` : ""}</div></div>`);
+}
+// Raster: eine Kachel pro Takt, durchgezählt über den ganzen Song. Akkorde aus der Akkordzeile laufen reihum,
+// je einer pro Takt („Am F C G“ über 8 Takte = zweimal durch); „-“ oder „%“ = Takt ohne eigenen Akkord
+function mapGrid(map) {
+  let n = 0;
+  return `<div class="mapgrid">` + map.map((p, i) => {
+    const col = partColor(p.name), ch = (p.chords || "").trim().split(/[\s|,]+/).filter(Boolean);
+    let tiles = "";
+    for (let r = 0; r < p.rep; r++) {
+      if (r) tiles += `<div class="again">Wiederholung ${r + 1}</div>`;
+      for (let b = 0; b < p.bars; b++) {
+        const c = ch.length ? ch[b % ch.length] : "";
+        tiles += `<div style="border-color:${col};background:${col}2e"><small>${++n}</small>${/^[-%]$/.test(c) ? "" : esc(c)}</div>`;
+      }
+    }
+    return `<div class="lab" id="glab${i}" data-edit="${i}"><span style="color:${col}">${esc(p.name || "–")}</span>
+      <small>${p.bars} Takte${p.rep > 1 ? " × " + p.rep : ""}</small>${p.note ? `<span class="nt">${esc(p.note)}</span>` : ""}</div>
+      <div class="bars">${tiles}</div>`;
+  }).join("") + `</div>`;
 }
 $("pMap").addEventListener("click", (e) => {
   const u = ud(), map = u.map = u.map || [];
+  const v = e.target.closest("[data-view]");
+  if (v) { setting("stage-map-view", v.dataset.view); renderMap(); return; }
   const go = e.target.closest("[data-goto]");
-  if (go) { e.preventDefault(); $("part" + go.dataset.goto).scrollIntoView({ behavior: "smooth", block: "center" }); return; }
+  if (go) { e.preventDefault(); ($("part" + go.dataset.goto) || $("glab" + go.dataset.goto)).scrollIntoView({ behavior: "smooth", block: "center" }); return; }
+  const ed = e.target.closest("[data-edit]");
+  if (ed) {   // Teilname im Raster antippen: zur Liste, dort lässt er sich bearbeiten
+    setting("stage-map-view", "list"); renderMap();
+    $("part" + ed.dataset.edit).scrollIntoView({ block: "center" }); return;
+  }
   const b = e.target.closest("button");
   if (!b) return;
   const card = b.closest(".part"), i = card ? +card.dataset.i : -1, p = map[i];
