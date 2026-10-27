@@ -428,7 +428,7 @@ function importBackup(b) {
   saveData();
 }
 
-// Vorschlagsdatei (z. B. aus Suno): Tempo, Takt, Songmap, Taktraster – nur dort, wo noch nichts eingetragen ist
+// Vorschlagsdatei (z. B. aus Suno): Tempo, Takt, Songmap, Taktraster, Liedtext – nur dort, wo noch nichts eingetragen ist
 function importSuggestion(b) {
   let added = 0, filled = 0;
   for (const s of b.songs || []) {
@@ -442,6 +442,9 @@ function importSuggestion(b) {
     if (!takt && s.time) { (d.fields = d.fields || []).push({ k: "Takt", v: s.time }); changed = true; }
     if (!(d.map && d.map.length) && s.map) { d.map = s.map; changed = true; }
     if (!d.grid && s.grid) { d.grid = s.grid; changed = true; }
+    if (s.text && !(song.sections || []).length && typeof d.text !== "string") {   // Liedtext nur, wo noch keiner ist
+      song.sections = parse("x.txt", s.text).sections; changed = true;
+    }
     if (changed) { d.updated = Date.now(); filled++; }
   }
   songs.sort((a, b) => a.nr - b.nr || a.title.localeCompare(b.title));
