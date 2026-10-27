@@ -4,7 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<title>Bühne</title>
+<title>Stagehand</title>
+<meta name="apple-mobile-web-app-title" content="Stagehand">
 <style>
   :root { --bg:#0b0b0c; --panel:#141416; --panel2:#1c1c1f; --fg:#f2f2f2; --dim:#7a7a80; --line:#2a2a2e;
     --string:#55555b; --accent:#c6ff3d; --mute:#e5392b; --size:34px; }
@@ -381,7 +382,8 @@ $("file").onchange = async (e) => {
     const text = await f.text();
     let backup = null;
     try { backup = JSON.parse(text); } catch (err) {}
-    if (backup && backup.app === "buehne") { importBackup(backup); restored++; }
+    // „buehne“ = Sicherungen vor der Umbenennung in Stagehand
+    if (backup && (backup.app === "stagehand" || backup.app === "buehne")) { importBackup(backup); restored++; }
     else loaded.push(parse(f.name, text));
   }
   if (loaded.length) mergeSongs(loaded);
@@ -401,11 +403,11 @@ function importBackup(b) {
 // ---------- Sichern ----------
 $("backup").onclick = async () => {
   const day = new Date().toISOString().slice(0, 10);
-  const name = "buehne-" + day + ".json";
+  const name = "stagehand-" + day + ".json";
   const out = JSON.parse(JSON.stringify(data));      // Akkordnamen mitschreiben, damit sie am Mac lesbar sind
   for (const d of Object.values(out.songs))
     (d.chords || []).forEach(c => c.label = c.auto ? nameChord(c.frets, (TUNINGS[d.tuning] || TUNINGS.std)[1]) : c.name);
-  const json = JSON.stringify({ app: "buehne", v: 1, saved: new Date().toISOString(), songs, data: out });
+  const json = JSON.stringify({ app: "stagehand", v: 1, saved: new Date().toISOString(), songs, data: out });
   const file = new File([json], name, { type: "application/json" });
   try {
     if (navigator.canShare && navigator.canShare({ files: [file] })) { await navigator.share({ files: [file] }); return; }
