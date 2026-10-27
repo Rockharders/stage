@@ -31,6 +31,13 @@
   .dot.on { background:var(--accent); }
   .size { display:none; gap:6px; }
   body[data-page=text]:not(.listing) .size { display:flex; }
+  .clickbtn { display:none; align-items:center; gap:8px; padding:8px 12px; color:var(--dim); white-space:nowrap; }
+  body[data-page=text]:not(.listing) .clickbtn { display:flex; }
+  .clickbtn.on { color:var(--fg); }
+  .cdots { display:flex; gap:5px; }
+  .cdots i { width:11px; height:11px; border-radius:50%; background:#333338; }
+  .cdots i.hit { background:var(--fg); }
+  .cdots i.hit.one { background:var(--accent); }
   nav.pages { display:flex; gap:4px; margin:0 -6px; }
   nav.pages button { background:none; border:0; border-bottom:2px solid transparent; border-radius:0; padding:10px 14px 12px;
     font-size:14px; font-weight:600; letter-spacing:.14em; color:var(--dim); }
@@ -40,7 +47,7 @@
   .page { display:none; padding:20px 20px 40vh; }
   body:not(.listing)[data-page=text] #pText, body:not(.listing)[data-page=info] #pInfo,
   body:not(.listing)[data-page=chords] #pChords, body:not(.listing)[data-page=tabs] #pTabs,
-  body:not(.listing)[data-page=map] #pMap { display:block; }
+  body:not(.listing)[data-page=map] #pMap, body:not(.listing)[data-page=click] #pClick { display:block; }
 
   /* ---------- Songliste ---------- */
   #list { display:none; padding:20px 20px 40px; }
@@ -115,6 +122,31 @@
   .bars div small { position:absolute; left:7px; top:4px; font-size:11px; font-weight:500; color:var(--dim); }
   .bars .again { grid-column:1 / -1; height:auto; border:0; justify-content:flex-start; font-size:12px; font-weight:500;
     color:var(--dim); letter-spacing:.12em; text-transform:uppercase; margin:4px 0 0; }
+
+  /* ---------- CLICK ---------- */
+  .ckbeats { display:flex; gap:10px; height:min(34vh, 300px); margin:0 0 12px; }
+  .ckbeats div { flex:1; min-width:0; border-radius:16px; background:var(--panel); display:flex; align-items:center;
+    justify-content:center; font-size:clamp(28px, 7vw, 76px); font-weight:700; color:#3a3a40; }
+  .ckbeats div.hit { background:var(--fg); color:#000; box-shadow:0 0 40px rgba(255,255,255,.25); }
+  .ckbeats div.hit.one { background:var(--accent); box-shadow:0 0 50px rgba(198,255,61,.45); }
+  .cksweep { position:relative; height:6px; border-radius:3px; background:var(--panel); margin:0 0 26px; overflow:hidden; }
+  .cksweep i { position:absolute; left:0; top:0; bottom:0; width:0; background:var(--dim); border-radius:3px; }
+  .ckinfo { display:flex; flex-wrap:wrap; align-items:flex-end; gap:10px 34px; margin:0 0 24px; }
+  .ckinfo .bpm { font-size:clamp(56px, 11vw, 110px); font-weight:700; line-height:.9; font-variant-numeric:tabular-nums; }
+  .ckinfo .bpm small { font-size:20px; font-weight:500; color:var(--dim); margin-left:8px; }
+  .ckinfo .v { font-size:30px; font-weight:600; font-variant-numeric:tabular-nums; }
+  .ckmap { position:relative; }
+  .ckmap .head { position:absolute; top:-6px; bottom:-6px; width:3px; margin-left:-1px; background:#fff; border-radius:2px;
+    box-shadow:0 0 0 2px #000; }
+  .cknow { display:flex; flex-wrap:wrap; align-items:baseline; gap:6px 18px; margin:0 0 26px; }
+  .cknow b { font-size:34px; }
+  .cknow span { font-size:20px; color:var(--dim); }
+  .cknow .nx { color:var(--fg); }
+  .ckctl { display:flex; flex-wrap:wrap; gap:10px; margin:0 0 14px; }
+  .ckctl button { font-size:20px; padding:14px 22px; border-radius:14px; }
+  .ckctl button.tap { flex:1 1 200px; font-weight:700; letter-spacing:.1em; }
+  .ckctl button.tap:active { background:var(--accent); color:#000; }
+  .ckctl button:disabled { opacity:.35; }
 
   /* ---------- GRIFFE ---------- */
   .cgrid { display:grid; grid-template-columns:repeat(auto-fill, minmax(160px, 1fr)); gap:14px; }
@@ -198,12 +230,13 @@
     <div class="midi"><div class="dot" id="dot"></div><span id="midiText">MIDI</span></div>
     <h1 id="title">Songs</h1>
     <span class="meta" id="meta"></span>
+    <button class="clickbtn" id="clickBtn" aria-label="Click an/aus">Click</button>
     <div class="size"><button id="smaller" aria-label="Schrift kleiner">A−</button><button id="bigger" aria-label="Schrift größer">A+</button></div>
     <button id="toggleList">Songs</button>
   </div>
   <nav class="pages" id="pages">
     <button data-p="text">TEXT</button><button data-p="info">INFO</button><button data-p="map">SONGMAP</button>
-    <button data-p="chords">GRIFFE</button><button data-p="tabs">TABS</button>
+    <button data-p="chords">GRIFFE</button><button data-p="tabs">TABS</button><button data-p="click">CLICK</button>
   </nav>
 </header>
 
@@ -222,6 +255,7 @@
 <div class="page" id="pMap"></div>
 <div class="page" id="pChords"></div>
 <div class="page" id="pTabs"></div>
+<div class="page" id="pClick"></div>
 </div>
 
 <div class="sheet" id="editor"><div class="box"></div></div>
@@ -502,6 +536,7 @@ function setPage(p) {
   if (p === "map") renderMap();
   if (p === "chords") renderChords();
   if (p === "tabs") renderTabs();
+  if (p === "click") renderClick();
   $("scroll").scrollTop = 0;
 }
 $("pages").onclick = (e) => { const b = e.target.closest("button"); if (b) setPage(b.dataset.p); };
@@ -531,6 +566,7 @@ function highlight(scroll = true) {
 function openSong(i) {
   if (i < 0 || i >= songs.length) return;
   current = i; section = 0;
+  clickSong();
   document.body.classList.remove("listing");
   ["editor", "picker", "textbox"].forEach(id => $(id).classList.remove("open"));
   renderSong(); renderList(); setPage("text");   // Songwechsel landet immer beim Text
@@ -775,12 +811,17 @@ const PARTS = ["Intro", "Strophe", "Pre", "Refrain", "Bridge", "Solo", "Break", 
 const PART_COLORS = [[/intro|outro|ende|end/, "#9aa5b1"], [/strophe|verse|vers/, "#4db8ff"], [/pre/, "#ffb02e"],
   [/refrain|chorus|hook/, "#c6ff3d"], [/bridge|c-teil/, "#b48cff"], [/solo/, "#ff6b5e"], [/break|zwischen|inter/, "#2ec4b6"]];
 const partColor = (name) => (PART_COLORS.find(([re]) => re.test(name.toLowerCase())) || [0, "#8a8a92"])[1];
-function beatsPerBar() {   // aus dem Feld „Takt“ (Datei oder eigenes Feld), sonst 4/4
+// Taktart aus dem Feld „Takt“ (Datei oder eigenes Feld), sonst 4/4. Schläge = worauf sich das Tempo bezieht:
+// x/4 in Vierteln, 6/8 · 9/8 · 12/8 in punktierten Vierteln, andere x/8 in Vierteln (halbe Zahl)
+function timeSig() {
   const s = songs[current], f = [...(s.info || []), ...(ud().fields || []).map(x => [x.k, x.v])]
     .find(([k]) => /^takt$/i.test(k.trim()));
   const m = f && String(f[1]).match(/(\d+)\s*\/\s*(\d+)/);
-  return m ? +m[1] / (+m[2] === 8 ? 2 : 1) : 4;
+  const num = m ? +m[1] : 4, den = m ? +m[2] : 4;
+  const beats = den === 8 ? (num % 3 === 0 && num > 3 ? num / 3 : Math.max(1, Math.round(num / 2))) : num;
+  return { num, den, beats };
 }
+const beatsPerBar = () => timeSig().beats;
 function renderMap() {
   const s = songs[current], u = ud(), map = u.map || [];
   const bars = map.reduce((n, p) => n + p.bars * p.rep, 0), bpm = parseFloat(val("tempo", s.tempo));
@@ -992,10 +1033,185 @@ function fontSize(d) {
 $("smaller").onclick = () => fontSize(-4);
 $("bigger").onclick = () => fontSize(4);
 
+// ---------- CLICK: sichtbarer Takt aus Songtempo, Tap am iPad oder MIDI-Clock vom MC8 ----------
+// Ein durchlaufender Schlagzähler (globalBeat); offset legt fest, welcher Schlag die Eins von Takt 1 ist.
+const clk = { on: setting("stage-click") === "1", tapBpm: 0, t0: performance.now(), offset: 0, taps: [],
+  ticks: 0, tickAt: -1e9, tickTimes: [], clockBpm: 0, raf: 0, shape: "", last: "" };
+const clockLive = () => performance.now() - clk.tickAt < 600 && clk.clockBpm > 0;
+const songTempo = () => parseFloat(val("tempo", songs[current].tempo)) || 0;
+const clickBpm = () => clockLive() ? clk.clockBpm : clk.tapBpm || songTempo();
+const clickSource = () => clockLive() ? "MC8-Clock" : clk.tapBpm ? "Tap" : "Songtempo";
+function globalBeat(now) {
+  if (clockLive()) return (clk.ticks + Math.min(1, (now - clk.tickAt) * clk.clockBpm * 24 / 60000)) / 24;
+  const bpm = clickBpm();
+  return bpm ? (now - clk.t0) * bpm / 60000 : 0;
+}
+function setTempo(change) {   // Tempo ändern, ohne dass der Schlag springt
+  const now = performance.now(), gb = globalBeat(now);
+  change();
+  const bpm = clickBpm();
+  if (bpm && !clockLive()) clk.t0 = now - gb * 60000 / bpm;
+}
+const downbeat = () => { clk.offset = Math.round(globalBeat(performance.now())); };   // dieser Schlag ist die Eins
+function clickSong() {   // neuer Song: sein Tempo, Takt 1 beginnt jetzt
+  if (current === null) return;
+  setTempo(() => { clk.tapBpm = 0; });
+  downbeat(); clk.shape = "";
+  drawClick();
+}
+function setClick(on) {
+  clk.on = on; setting("stage-click", on ? "1" : "0");
+  if (on) { if (!clockLive()) clk.t0 = performance.now(); downbeat(); }
+  clk.shape = ""; drawClick();
+  if (page === "click") renderClick();
+}
+function tapTempo() {
+  const now = performance.now();
+  clk.taps = clk.taps.filter(t => now - t < 2500).concat(now).slice(-5);
+  if (clk.taps.length < 2) return;
+  const avg = (clk.taps[clk.taps.length - 1] - clk.taps[0]) / (clk.taps.length - 1);
+  const sb = Math.round(globalBeat(now) - clk.offset);
+  clk.tapBpm = Math.round(60000 / avg);
+  clk.t0 = now; clk.offset = -sb;            // der letzte Tap liegt genau auf dem Schlag, Taktzählung läuft weiter
+  if (!clk.on) setClick(true); else { clk.shape = ""; renderClick(); }
+}
+function clickState() {
+  const sig = timeSig(), sb = globalBeat(performance.now()) - clk.offset, whole = Math.floor(sb);
+  return { sig, sb, beat: ((whole % sig.beats) + sig.beats) % sig.beats, phase: sb - whole,
+           bar: Math.floor(whole / sig.beats) + 1, bpm: clickBpm() };
+}
+function drawClick() {   // pro Bild: kleine Anzeige im Kopf und (falls offen) die CLICK-Seite
+  cancelAnimationFrame(clk.raf); clk.raf = 0;
+  if (current === null) return;
+  const st = clickState(), btn = $("clickBtn");
+  const shape = [clk.on, st.sig.beats, Math.round(st.bpm)].join();
+  if (shape !== clk.shape) {
+    clk.shape = shape;
+    btn.classList.toggle("on", clk.on);
+    btn.innerHTML = clk.on && st.bpm ? `<span class="cdots">${Array.from({ length: st.sig.beats }, (_, i) =>
+      `<i class="${i ? "" : "one"}"></i>`).join("")}</span>${Math.round(st.bpm)}` : "Click";
+    clk.last = "";
+    if ($("ckBpm")) { $("ckBpm").textContent = st.bpm ? Math.round(st.bpm) : "–"; $("ckSrc").textContent = clickSource(); }
+  }
+  if (!clk.on || !st.bpm) return;
+  const key = st.bar + "." + st.beat;
+  if (key !== clk.last) {   // neuer Schlag
+    clk.last = key;
+    btn.querySelectorAll(".cdots i").forEach((d, i) => d.classList.toggle("hit", i === st.beat));
+    document.querySelectorAll(".ckbeats div").forEach((d, i) => d.classList.toggle("hit", i === st.beat));
+    if (page === "click") clickPos(st);
+  }
+  const fade = 1 - 0.75 * Math.min(1, st.phase * 1.6);   // aufleuchten und abklingen
+  const lit = btn.querySelector(".cdots i.hit"); if (lit) lit.style.opacity = fade;
+  if (page === "click") {
+    const box = document.querySelector(".ckbeats div.hit"); if (box) box.style.opacity = 0.35 + 0.65 * fade;
+    const sw = document.querySelector(".cksweep i"); if (sw) sw.style.width = ((st.beat + st.phase) / st.sig.beats * 100) + "%";
+    const hd = document.querySelector(".ckmap .head"), total = mapBars();
+    if (hd && total) hd.style.left = Math.max(0, Math.min(100, st.sb / st.sig.beats / total * 100)) + "%";
+  }
+  clk.raf = requestAnimationFrame(drawClick);
+}
+const mapBars = () => (ud().map || []).reduce((n, p) => n + p.bars * p.rep, 0);
+function clickPos(st) {   // Takt, Teil der Songmap, was als Nächstes kommt
+  const set = (id, t) => { const el = $(id); if (el) el.textContent = t; };
+  set("ckBar", st.bar > 0 ? st.bar : "–");
+  set("ckBeat", st.beat + 1);
+  const map = ud().map || [];
+  if (!map.length || !$("ckPart")) return;
+  let start = 1, i = 0;
+  while (i < map.length && st.bar >= start + map[i].bars * map[i].rep) { start += map[i].bars * map[i].rep; i++; }
+  if (st.bar < 1) { set("ckPart", "Gleich: " + (map[0].name || "–")); set("ckPartPos", ""); set("ckNext", ""); return; }
+  if (i >= map.length) { set("ckPart", "Ende"); set("ckPartPos", ""); set("ckNext", ""); return; }
+  const p = map[i], pos = st.bar - start, left = p.bars * p.rep - pos;
+  set("ckPart", p.name || "–");
+  set("ckPartPos", `Takt ${pos % p.bars + 1} von ${p.bars}` + (p.rep > 1 ? ` · ${Math.floor(pos / p.bars) + 1}. Durchgang` : ""));
+  set("ckNext", map[i + 1] ? `→ ${map[i + 1].name || "–"} ${left === 1 ? "im nächsten Takt" : "in " + left + " Takten"}` : `→ Ende in ${left}`);
+}
+function renderClick() {
+  if (current === null) return;
+  const st = clickState(), map = ud().map || [], live = clockLive();
+  const saved = songTempo(), tapDiff = clk.tapBpm && clk.tapBpm !== saved;
+  $("pClick").innerHTML = `
+    <div class="ckbeats">${Array.from({ length: st.sig.beats }, (_, i) => `<div class="${i ? "" : "one"}">${i + 1}</div>`).join("")}</div>
+    <div class="cksweep"><i></i></div>
+    <div class="ckinfo">
+      <div class="bpm"><span id="ckBpm">${st.bpm ? Math.round(st.bpm) : "–"}</span><small>BPM</small></div>
+      <div><span class="cap">Takt</span><span class="v" id="ckBar">–</span></div>
+      <div><span class="cap">Schlag</span><span class="v" id="ckBeat">–</span></div>
+      <div><span class="cap">Taktart</span><span class="v">${st.sig.num}/${st.sig.den}</span></div>
+      <div><span class="cap">Quelle</span><span class="v" id="ckSrc">${clickSource()}</span></div>
+    </div>
+    ${map.length ? `<div class="mapbar ckmap">${map.map((p, i) => `<a href="#" data-goto="${i}" style="flex:${p.bars * p.rep};background:${partColor(p.name)}">
+      ${esc(p.name || "–")}<small>${p.bars}${p.rep > 1 ? " × " + p.rep : ""}</small></a>`).join("")}<i class="head"></i></div>
+      <div class="cknow"><b id="ckPart"></b><span id="ckPartPos"></span><span class="nx" id="ckNext"></span></div>` : ""}
+    <div class="ckctl">
+      <button class="${clk.on ? "" : "primary"}" data-ck="run">${clk.on ? "Stopp" : "Start"}</button>
+      <button data-ck="one" ${clk.on ? "" : "disabled"}>Eins</button>
+      <button class="tap" data-ck="tap" ${live ? "disabled" : ""}>TAP</button>
+      <button data-ck="-1" ${live || !st.bpm ? "disabled" : ""}>−</button>
+      <button data-ck="1" ${live || !st.bpm ? "disabled" : ""}>+</button>
+      ${tapDiff && !live ? `<button data-ck="save">${clk.tapBpm} als Songtempo</button>` : ""}
+    </div>
+    <p class="hint">${live ? "Tempo kommt vom MC8 (MIDI-Clock). Tap am MC8 ändert es hier mit." :
+      "Läuft mit dem Songtempo oder deinem Tap hier. Sobald der MC8 seine MIDI-Clock ans iPad schickt, übernimmt er."}
+      „Eins“ macht den aktuellen Schlag zur Eins von Takt 1 – zum Beispiel beim Einzählen.</p>`;
+  clk.shape = ""; clk.last = "";
+  drawClick();
+  if (!clk.on) clickPos(st);
+}
+$("clickBtn").onclick = () => setClick(!clk.on);
+$("pClick").addEventListener("pointerdown", (e) => {   // Tap sofort beim Berühren, nicht erst beim Loslassen
+  const b = e.target.closest("[data-ck=tap]");
+  if (b && !b.disabled) tapTempo();
+});
+$("pClick").addEventListener("click", (e) => {
+  const go = e.target.closest("[data-goto]");
+  if (go) {   // auf einen Teil tippen: dort geht es los
+    e.preventDefault();
+    const map = ud().map || [];
+    let bars = 0; for (let i = 0; i < +go.dataset.goto; i++) bars += map[i].bars * map[i].rep;
+    downbeat(); clk.offset -= bars * beatsPerBar(); clk.last = ""; return;
+  }
+  const b = e.target.closest("[data-ck]");
+  if (!b || b.disabled) return;
+  const a = b.dataset.ck;
+  if (a === "run") return setClick(!clk.on);
+  if (a === "one") { downbeat(); clk.last = ""; return; }
+  if (a === "save") { ud().tempo = String(clk.tapBpm); touch(); clk.tapBpm = 0; renderMeta(); renderClick(); return; }
+  if (a === "1" || a === "-1") { setTempo(() => { clk.tapBpm = Math.max(30, Math.min(300, Math.round(clickBpm()) + +a)); }); renderClick(); }
+});
+function onClock(st) {   // MIDI-Echtzeit: Clock (24 pro Viertel), Start, Weiter, Stopp
+  const now = performance.now(), wasLive = clockLive();
+  if (st === 0xfa) { clk.ticks = -1; clk.offset = 0; return; }   // Start: der nächste Tick ist die Eins
+  if (st !== 0xf8) return;
+  if (now - clk.tickAt > 600) clk.tickTimes = [];
+  clk.ticks++; clk.tickAt = now;
+  clk.tickTimes.push(now); if (clk.tickTimes.length > 49) clk.tickTimes.shift();
+  const n = clk.tickTimes.length;
+  if (n >= 13) clk.clockBpm = Math.round(60000 * (n - 1) / (clk.tickTimes[n - 1] - clk.tickTimes[0]) / 24 * 10) / 10;
+  if (!wasLive && clockLive()) {   // Clock taucht auf: Takt 1 beginnt hier
+    clk.ticks = 0; clk.offset = 0; clk.shape = "";
+    if (page === "click") renderClick();
+  }
+}
+setInterval(() => {   // Clock verschwunden? Zurück auf Songtempo, ohne Sprung
+  if (clk.clockBpm && !clockLive()) {
+    const gb = clk.ticks / 24, bpm = clk.clockBpm;
+    clk.clockBpm = 0;
+    clk.t0 = performance.now() - gb * 60000 / (clickBpm() || bpm);
+    clk.shape = ""; if (page === "click") renderClick();
+  }
+}, 500);
+
 // ---------- MIDI (MC8 Kanal 16) ----------
-let lastMsg = "", lastAt = 0;
+let lastMsg = "", lastAt = 0, lastRt = null;
 function onMidi(ev) {
   const [st, d1, d2] = ev.data;
+  if (st >= 0xf8) {   // Echtzeit: dasselbe Ereignis kommt evtl. über beide Wege an – am Zeitstempel erkennen
+    const id = ev.timeStamp || ev;
+    if (id === lastRt) return;
+    lastRt = id; onClock(st); return;
+  }
   const key = st + "," + d1 + "," + d2, now = Date.now();
   if (key === lastMsg && now - lastAt < 30) return;   // gleiches Ereignis doppelt gemeldet
   lastMsg = key; lastAt = now;
