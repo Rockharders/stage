@@ -541,7 +541,7 @@ function renderList() {
   $("songs").innerHTML = songs.map((s, i) =>
     `<a href="#" data-i="${i}" class="${i === current ? "active" : ""}"><span>${s.nr || ""}</span>${esc(s.title)}</a>`).join("");
   if (!songs.length) $("hint").textContent =
-    "Noch keine Songs. Tippe auf „Laden …“ und wähle die Textdateien aus Google Drive (MC8Pro/Songtexte).";
+    "Noch keine Songs. Tippe auf „Laden …“ und wähle die Textdateien aus Google Drive (xx_Hagen_Tools/Stage App/Songtexte).";
 }
 function setPage(p) {
   page = p;
