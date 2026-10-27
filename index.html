@@ -801,25 +801,23 @@ function renderMap() {
         <span class="mv"><button data-a="up" ${i ? "" : "disabled"}>↑</button><button data-a="down" ${i < map.length - 1 ? "" : "disabled"}>↓</button>
           <button data-a="dup">Kopie</button><button class="danger" data-a="del">✕</button></span>
       </div>
-      <input class="ch" data-k="chords" value="${esc(p.chords)}" placeholder="Akkorde je Takt, z. B. Am F C G  (- = Takt halten)" autocomplete="off">
+      <input class="ch" data-k="chords" value="${esc(p.chords)}" placeholder="Akkorde, z. B. Am F C G" autocomplete="off">
       <input class="nt" data-k="note" value="${esc(p.note)}" placeholder="Hinweis, z. B. Szene B, nur Bass, Break auf 4" autocomplete="off">
     </div></div>`).join("") + `
     <div class="field" style="margin-top:22px"><span class="cap">Teil anhängen</span><div class="chips">
       ${PARTS.map(n => `<button class="chip" data-add="${n}">+ ${n}</button>`).join("")}
       ${!map.length && fromText ? `<button class="chip" data-a="fromtext">Aus Songtext (${fromText} Teile)</button>` : ""}</div></div>`);
 }
-// Raster: eine Kachel pro Takt, durchgezählt über den ganzen Song. Akkorde aus der Akkordzeile laufen reihum,
-// je einer pro Takt („Am F C G“ über 8 Takte = zweimal durch); „-“ oder „%“ = Takt ohne eigenen Akkord
+// Raster: eine Kachel pro Takt, durchgezählt über den ganzen Song
 function mapGrid(map) {
   let n = 0;
   return `<div class="mapgrid">` + map.map((p, i) => {
-    const col = partColor(p.name), ch = (p.chords || "").trim().split(/[\s|,]+/).filter(Boolean);
+    const col = partColor(p.name);
     let tiles = "";
     for (let r = 0; r < p.rep; r++) {
       if (r) tiles += `<div class="again">Wiederholung ${r + 1}</div>`;
       for (let b = 0; b < p.bars; b++) {
-        const c = ch.length ? ch[b % ch.length] : "";
-        tiles += `<div style="border-color:${col};background:${col}2e"><small>${++n}</small>${/^[-%]$/.test(c) ? "" : esc(c)}</div>`;
+        tiles += `<div style="border-color:${col};background:${col}2e"><small>${++n}</small></div>`;
       }
     }
     return `<div class="lab" id="glab${i}" data-edit="${i}"><span style="color:${col}">${esc(p.name || "–")}</span>
