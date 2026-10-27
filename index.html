@@ -34,10 +34,13 @@
   .clickbtn { display:none; align-items:center; gap:8px; padding:8px 12px; color:var(--dim); white-space:nowrap; }
   body[data-page=text]:not(.listing) .clickbtn { display:flex; }
   .clickbtn.on { color:var(--fg); }
-  .cdots { display:flex; gap:5px; }
-  .cdots i { width:11px; height:11px; border-radius:50%; background:#333338; }
-  .cdots i.hit { background:var(--fg); }
-  .cdots i.hit.one { background:var(--accent); }
+  .clickbtn.on b { color:var(--accent); }
+  /* Lichtstreifen links und rechts am Rand der TEXT-Seite – im Augenwinkel sichtbar beim Lesen */
+  #edge { display:none; }
+  body.clicking[data-page=text]:not(.listing) #edge { display:block; }
+  #edge i { position:fixed; top:0; bottom:0; width:12px; z-index:4; opacity:0; background:var(--fg); pointer-events:none; }
+  #edge i:first-child { left:0; } #edge i:last-child { right:0; }
+  #edge.one i { background:var(--accent); }
   nav.pages { display:flex; gap:4px; margin:0 -6px; }
   nav.pages button { background:none; border:0; border-bottom:2px solid transparent; border-radius:0; padding:10px 14px 12px;
     font-size:14px; font-weight:600; letter-spacing:.14em; color:var(--dim); }
@@ -148,6 +151,8 @@
   .ckctl button.tap:active { background:var(--accent); color:#000; }
   .ckctl button:disabled { opacity:.35; }
   .ckctl .seg { margin-left:auto; }
+  .ckctl label { display:flex; align-items:center; gap:10px; color:var(--dim); font-size:15px; }
+  .ckctl input[type=range] { width:140px; accent-color:var(--accent); }
   .ckctl .seg button { padding:14px 18px; border-radius:0; }
   /* Ansicht „Fläche“: ein großes Feld blinkt, sonst nichts */
   .ckflash { position:relative; height:calc(100dvh - 250px); min-height:240px; border-radius:22px; background:var(--panel);
@@ -265,6 +270,7 @@
 <div class="page" id="pClick"></div>
 </div>
 
+<div id="edge"><i></i><i></i></div>
 <div class="sheet" id="editor"><div class="box"></div></div>
 <div class="sheet" id="picker"><div class="box"><h3></h3><div class="ptech"></div><div class="pgrid"></div></div></div>
 <div class="sheet" id="textbox"><div class="box">
@@ -1044,6 +1050,9 @@ $("bigger").onclick = () => fontSize(4);
 // Ein durchlaufender Schlagzähler (globalBeat); offset legt fest, welcher Schlag die Eins von Takt 1 ist.
 const clk = { on: setting("stage-click") === "1", tapBpm: 0, t0: performance.now(), offset: 0, taps: [],
   ticks: 0, tickAt: -1e9, tickTimes: [], clockBpm: 0, raf: 0, shape: "", last: "" };
+// Helligkeit für Fläche und Randstreifen; die Eins leuchtet voll, die anderen Schläge gedämpft
+const clickBright = () => (+setting("stage-click-bright") || 80) / 100;
+const OFFBEAT = 0.25;
 const clockLive = () => performance.now() - clk.tickAt < 600 && clk.clockBpm > 0;
 const songTempo = () => parseFloat(val("tempo", songs[current].tempo)) || 0;
 const clickBpm = () => clockLive() ? clk.clockBpm : clk.tapBpm || songTempo();
@@ -1095,8 +1104,8 @@ function drawClick() {   // pro Bild: kleine Anzeige im Kopf und (falls offen) d
   if (shape !== clk.shape) {
     clk.shape = shape;
     btn.classList.toggle("on", clk.on);
-    btn.innerHTML = clk.on && st.bpm ? `<span class="cdots">${Array.from({ length: st.sig.beats }, (_, i) =>
-      `<i class="${i ? "" : "one"}"></i>`).join("")}</span>${Math.round(st.bpm)}` : "Click";
+    document.body.classList.toggle("clicking", clk.on && !!st.bpm);
+    btn.innerHTML = clk.on && st.bpm ? `<b>Click</b> ${Math.round(st.bpm)}` : "Click";
     clk.last = "";
     if ($("ckBpm")) { $("ckBpm").textContent = st.bpm ? Math.round(st.bpm) : "–"; $("ckSrc").textContent = clickSource(); }
   }
@@ -1104,18 +1113,19 @@ function drawClick() {   // pro Bild: kleine Anzeige im Kopf und (falls offen) d
   const key = st.bar + "." + st.beat;
   if (key !== clk.last) {   // neuer Schlag
     clk.last = key;
-    btn.querySelectorAll(".cdots i").forEach((d, i) => d.classList.toggle("hit", i === st.beat));
+    $("edge").classList.toggle("one", st.beat === 0);
     document.querySelectorAll(".ckbeats div").forEach((d, i) => d.classList.toggle("hit", i === st.beat));
     const fl = document.querySelector(".ckflash");
     if (fl) fl.classList.toggle("one", st.beat === 0);
     if (page === "click") clickPos(st);
   }
   const fade = 1 - 0.75 * Math.min(1, st.phase * 1.6);   // aufleuchten und abklingen
-  const lit = btn.querySelector(".cdots i.hit"); if (lit) lit.style.opacity = fade;
+  const flash = Math.max(0, 1 - st.phase * 2.2) * clickBright() * (st.beat === 0 ? 1 : OFFBEAT);   // kurz voll, dann dunkel
+  if (page === "text") $("edge").querySelectorAll("i").forEach(i => { i.style.opacity = flash; });
   if (page === "click") {
     const box = document.querySelector(".ckbeats div.hit"); if (box) box.style.opacity = 0.35 + 0.65 * fade;
-    const fl = document.querySelector(".ckflash i");   // kurz voll, dann zurück ins Dunkel
-    if (fl) fl.style.opacity = Math.max(0, 1 - st.phase * 2.2);
+    const fl = document.querySelector(".ckflash i");
+    if (fl) fl.style.opacity = flash;
     const sw = document.querySelector(".cksweep i"); if (sw) sw.style.width = ((st.beat + st.phase) / st.sig.beats * 100) + "%";
     const hd = document.querySelector(".ckmap .head"), total = mapBars();
     if (hd && total) hd.style.left = Math.max(0, Math.min(100, st.sb / st.sig.beats / total * 100)) + "%";
@@ -1149,6 +1159,7 @@ function renderClick() {
       <button data-ck="-1" ${live || !st.bpm ? "disabled" : ""}>−</button>
       <button data-ck="1" ${live || !st.bpm ? "disabled" : ""}>+</button>
       ${tapDiff && !live ? `<button data-ck="save">${clk.tapBpm} als Songtempo</button>` : ""}
+      <label>Hell <input type="range" id="ckBright" min="10" max="100" step="5" value="${Math.round(clickBright() * 100)}"></label>
       <div class="seg"><button data-ckview="beats" class="${flash ? "" : "on"}">Felder</button><button data-ckview="flash" class="${flash ? "on" : ""}">Fläche</button></div>
     </div>`;
   if (flash) {
@@ -1177,6 +1188,9 @@ function renderClick() {
   if (!clk.on) clickPos(st);
 }
 $("clickBtn").onclick = () => setClick(!clk.on);
+$("pClick").addEventListener("input", (e) => {
+  if (e.target.id === "ckBright") setting("stage-click-bright", e.target.value);
+});
 $("pClick").addEventListener("pointerdown", (e) => {   // Tap sofort beim Berühren, nicht erst beim Loslassen
   const b = e.target.closest("[data-ck=tap]");
   if (b && !b.disabled) tapTempo();
