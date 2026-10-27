@@ -139,6 +139,15 @@
   .tcol .c span { position:relative; min-width:30px; height:30px; padding:0 6px; border-radius:15px; background:var(--panel);
     display:flex; align-items:center; justify-content:center; font-size:19px; font-weight:600; }
   .tcol .c span.x { color:var(--mute); }
+  .tcol .c i { position:absolute; left:-9px; top:0; z-index:1; font:italic 600 15px/1 -apple-system,Helvetica,sans-serif;
+    color:var(--accent); }
+  .tabmode { display:flex; justify-content:flex-end; margin:0 0 12px; }
+  .seg { display:inline-flex; border:1px solid var(--line); border-radius:10px; overflow:hidden; }
+  .seg button { border:0; border-radius:0; font-size:15px; padding:7px 16px; background:none; }
+  .seg button.on { background:var(--accent); color:#000; font-weight:600; }
+  .ptech { display:flex; gap:8px; margin:0 0 14px; }
+  .ptech button { flex:1; font-size:16px; padding:10px 6px; }
+  .ptech button.on { background:var(--accent); border-color:var(--accent); color:#000; font-weight:600; }
   .tcol.sel { background:rgba(198,255,61,.08); }
   .tcol.sel .hd { color:var(--accent); font-weight:700; }
   .tabtools { display:flex; flex-wrap:wrap; gap:8px; padding:10px 14px 0; }
@@ -177,7 +186,7 @@
 </div>
 
 <div class="sheet" id="editor"><div class="box"></div></div>
-<div class="sheet" id="picker"><div class="box"><h3></h3><div class="pgrid"></div></div></div>
+<div class="sheet" id="picker"><div class="box"><h3></h3><div class="ptech"></div><div class="pgrid"></div></div></div>
 <div class="sheet" id="textbox"><div class="box">
   <div class="tabhead" style="padding:0 0 12px"><b class="grow" id="tbTitle"></b><button id="tbCopy">Kopieren</button>
     <button id="tbSave">Als Datei</button><button class="primary" id="tbClose">Fertig</button></div>
@@ -411,16 +420,27 @@ function chordSVG(c, interactive) {
 
 // ---------- Bund-Auswahl ----------
 let pickCb = null;
-function pick(title, values, cur, cb) {
+let pickTech = null;
+function pick(title, values, cur, cb, tech) {
   const lab = (v) => v === null ? "leer" : v === "x" ? "X" : v;
   $("picker").querySelector("h3").textContent = title;
+  pickTech = tech || null;
+  renderTech();
   $("picker").querySelector(".pgrid").innerHTML = values.map((v, i) =>
     `<button data-i="${i}" class="${v === cur ? "on" : ""} ${v === "x" ? "x" : ""} ${v === null ? "wide" : ""}">${lab(v)}</button>`).join("");
   pickCb = (i) => cb(values[i]);
   $("picker").classList.add("open");
 }
 const FRETS = Array.from({ length: 25 }, (_, i) => i);
+function renderTech() {   // Übergang zur Note: Hammer-on/Pull-off oder Slide (nur im Tab)
+  const el = $("picker").querySelector(".ptech");
+  el.style.display = pickTech ? "" : "none";
+  if (pickTech) el.innerHTML = TECHS.map(([k, lab]) =>
+    `<button data-tech="${k}" class="${(pickTech.cur || "") === k ? "on" : ""}">${lab}</button>`).join("");
+}
 $("picker").onclick = (e) => {
+  const t = e.target.closest("[data-tech]");
+  if (t) { pickTech.cur = t.dataset.tech || null; pickTech.cb(pickTech.cur); renderTech(); return; }
   const b = e.target.closest("button");
   if (b) pickCb(+b.dataset.i);
   if (b || e.target === e.currentTarget) $("picker").classList.remove("open");
@@ -713,16 +733,30 @@ function closeEditor() { $("editor").classList.remove("open"); renderChords(); }
 // TABS
 let tabSel = {};   // gewählter Schritt pro Tab
 const emptyStep = () => ({ f: [null, null, null, null, null, null], bar: false });
+const TECHS = [["", "normal"], ["l", "Hammer / Pull"], ["s", "Slide"]];
+// Zeichen vor der Note: h/p bzw. / oder \ – je nachdem, ob die Note davor auf der Saite tiefer oder höher liegt
+function techMark(tb, si, s) {
+  const t = (tb.steps[si].t || [])[s], cur = tb.steps[si].f[s];
+  if (!t || typeof cur !== "number") return "";
+  let prev = null;
+  for (let i = si - 1; i >= 0 && prev === null; i--) if (typeof tb.steps[i].f[s] === "number") prev = tb.steps[i].f[s];
+  const down = prev !== null && prev > cur;
+  return t === "l" ? (down ? "p" : "h") : (down ? "\\" : "/");
+}
+const tabNotes = () => setting("stage-tab-notes") === "1";
 function renderTabs() {
-  const u = ud(), names = stringNames(tuning());
-  $("pTabs").innerHTML = (u.tabs.length ? "" : `<p class="empty">Noch keine Tabs für diesen Song.</p>`) +
+  const u = ud(), t = tuning(), names = stringNames(t), notes = tabNotes();
+  const show = (v, s) => v === "x" ? "X" : notes ? NOTE[(t[s] + v) % 12] : v;
+  $("pTabs").innerHTML = `<div class="tabmode"><div class="seg"><button data-mode="0" class="${notes ? "" : "on"}">Zahl</button>` +
+    `<button data-mode="1" class="${notes ? "on" : ""}">Ton</button></div></div>` +
+    (u.tabs.length ? "" : `<p class="empty">Noch keine Tabs für diesen Song.</p>`) +
     u.tabs.map((tb, ti) => {
       const sel = tabSel[ti] ?? -1;
       const cols = tb.steps.map((st, si) => `
         <div class="tcol ${si === sel ? "sel" : ""} ${st.bar ? "bar" : ""}" data-t="${ti}" data-step="${si}">
           <div class="hd">${si + 1}</div><div class="cells">
           ${[5, 4, 3, 2, 1, 0].map(s => `<div class="c" data-str="${s}">${st.f[s] === null ? "" :
-            `<span class="${st.f[s] === "x" ? "x" : ""}">${st.f[s] === "x" ? "X" : st.f[s]}</span>`}</div>`).join("")}</div></div>`).join("");
+            `<i>${techMark(tb, si, s)}</i><span class="${st.f[s] === "x" ? "x" : ""}">${show(st.f[s], s)}</span>`}</div>`).join("")}</div></div>`).join("");
       return `<div class="tabblock" data-t="${ti}">
         <div class="tabhead"><input value="${esc(tb.title)}" data-title="${ti}" placeholder="Name (z. B. Intro-Riff)">
           <button data-act="text">Als Text</button><button class="danger" data-act="del">Löschen</button></div>
@@ -737,7 +771,8 @@ function renderTabs() {
     }).join("") + `<button id="addTab">+ Tab</button>`;
 }
 $("pTabs").onclick = (e) => {
-  const u = ud();
+  const u = ud(), m = e.target.closest("[data-mode]");
+  if (m) { setting("stage-tab-notes", m.dataset.mode); renderTabs(); return; }
   if (e.target.closest("#addTab")) {
     u.tabs.push({ title: "", steps: Array.from({ length: 16 }, emptyStep) });
     touch(); renderTabs(); return;
@@ -750,7 +785,9 @@ $("pTabs").onclick = (e) => {
       const s = +c.dataset.str, step = u.tabs[ti].steps[si];
       pick("Schritt " + (si + 1) + " · Saite " + stringNames(tuning())[s], [null, "x", ...FRETS], step.f[s], (v) => {
         step.f[s] = v; touch(); renderTabs();
-      });
+      }, { cur: (step.t || [])[s] || null, cb: (k) => {
+        step.t = step.t || [null, null, null, null, null, null]; step.t[s] = k; touch(); renderTabs();
+      } });
     }
     renderTabs(); return;
   }
@@ -777,9 +814,10 @@ $("pTabs").addEventListener("input", (e) => {
 });
 function tabText(tb) {
   const names = stringNames(tuning());
-  const w = tb.steps.map(st => Math.max(1, ...st.f.map(v => v === null ? 1 : String(v).length)));
+  const cell = (i, s) => { const v = tb.steps[i].f[s]; return v === null ? "" : v === "x" ? "x" : techMark(tb, i, s) + v; };
+  const w = tb.steps.map((st, i) => Math.max(1, ...[0, 1, 2, 3, 4, 5].map(s => cell(i, s).length)));
   return [5, 4, 3, 2, 1, 0].map(s => names[s].padEnd(2) + "|-" + tb.steps.map((st, i) => {
-    const v = st.f[s] === null ? "" : st.f[s] === "x" ? "x" : String(st.f[s]);
+    const v = cell(i, s);
     return v.padEnd(w[i], "-") + "-" + (st.bar ? "|-" : "");
   }).join("") + "|").join("\n");
 }
