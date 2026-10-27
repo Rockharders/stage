@@ -147,6 +147,13 @@
   .ckctl button.tap { flex:1 1 200px; font-weight:700; letter-spacing:.1em; }
   .ckctl button.tap:active { background:var(--accent); color:#000; }
   .ckctl button:disabled { opacity:.35; }
+  .ckctl .seg { margin-left:auto; }
+  .ckctl .seg button { padding:14px 18px; border-radius:0; }
+  /* Ansicht „Fläche“: ein großes Feld blinkt, sonst nichts */
+  .ckflash { position:relative; height:calc(100dvh - 250px); min-height:240px; border-radius:22px; background:var(--panel);
+    margin:0 0 16px; overflow:hidden; }
+  .ckflash i { position:absolute; inset:0; opacity:0; background:var(--fg); }
+  .ckflash.one i { background:var(--accent); }
 
   /* ---------- GRIFFE ---------- */
   .cgrid { display:grid; grid-template-columns:repeat(auto-fill, minmax(160px, 1fr)); gap:14px; }
@@ -1099,12 +1106,16 @@ function drawClick() {   // pro Bild: kleine Anzeige im Kopf und (falls offen) d
     clk.last = key;
     btn.querySelectorAll(".cdots i").forEach((d, i) => d.classList.toggle("hit", i === st.beat));
     document.querySelectorAll(".ckbeats div").forEach((d, i) => d.classList.toggle("hit", i === st.beat));
+    const fl = document.querySelector(".ckflash");
+    if (fl) fl.classList.toggle("one", st.beat === 0);
     if (page === "click") clickPos(st);
   }
   const fade = 1 - 0.75 * Math.min(1, st.phase * 1.6);   // aufleuchten und abklingen
   const lit = btn.querySelector(".cdots i.hit"); if (lit) lit.style.opacity = fade;
   if (page === "click") {
     const box = document.querySelector(".ckbeats div.hit"); if (box) box.style.opacity = 0.35 + 0.65 * fade;
+    const fl = document.querySelector(".ckflash i");   // kurz voll, dann zurück ins Dunkel
+    if (fl) fl.style.opacity = Math.max(0, 1 - st.phase * 2.2);
     const sw = document.querySelector(".cksweep i"); if (sw) sw.style.width = ((st.beat + st.phase) / st.sig.beats * 100) + "%";
     const hd = document.querySelector(".ckmap .head"), total = mapBars();
     if (hd && total) hd.style.left = Math.max(0, Math.min(100, st.sb / st.sig.beats / total * 100)) + "%";
@@ -1130,7 +1141,20 @@ function clickPos(st) {   // Takt, Teil der Songmap, was als Nächstes kommt
 function renderClick() {
   if (current === null) return;
   const st = clickState(), map = ud().map || [], live = clockLive();
-  const saved = songTempo(), tapDiff = clk.tapBpm && clk.tapBpm !== saved;
+  const saved = songTempo(), tapDiff = clk.tapBpm && clk.tapBpm !== saved, flash = setting("stage-click-view") === "flash";
+  const ctl = `<div class="ckctl">
+      <button class="${clk.on ? "" : "primary"}" data-ck="run">${clk.on ? "Stopp" : "Start"}</button>
+      <button data-ck="one" ${clk.on ? "" : "disabled"}>Eins</button>
+      <button class="tap" data-ck="tap" ${live ? "disabled" : ""}>TAP</button>
+      <button data-ck="-1" ${live || !st.bpm ? "disabled" : ""}>−</button>
+      <button data-ck="1" ${live || !st.bpm ? "disabled" : ""}>+</button>
+      ${tapDiff && !live ? `<button data-ck="save">${clk.tapBpm} als Songtempo</button>` : ""}
+      <div class="seg"><button data-ckview="beats" class="${flash ? "" : "on"}">Felder</button><button data-ckview="flash" class="${flash ? "on" : ""}">Fläche</button></div>
+    </div>`;
+  if (flash) {
+    $("pClick").innerHTML = `<div class="ckflash"><i></i></div>${ctl}`;
+    clk.shape = ""; clk.last = ""; drawClick(); return;
+  }
   $("pClick").innerHTML = `
     <div class="ckbeats">${Array.from({ length: st.sig.beats }, (_, i) => `<div class="${i ? "" : "one"}">${i + 1}</div>`).join("")}</div>
     <div class="cksweep"><i></i></div>
@@ -1144,14 +1168,7 @@ function renderClick() {
     ${map.length ? `<div class="mapbar ckmap">${map.map((p, i) => `<a href="#" data-goto="${i}" style="flex:${p.bars * p.rep};background:${partColor(p.name)}">
       ${esc(p.name || "–")}<small>${p.bars}${p.rep > 1 ? " × " + p.rep : ""}</small></a>`).join("")}<i class="head"></i></div>
       <div class="cknow"><b id="ckPart"></b><span id="ckPartPos"></span><span class="nx" id="ckNext"></span></div>` : ""}
-    <div class="ckctl">
-      <button class="${clk.on ? "" : "primary"}" data-ck="run">${clk.on ? "Stopp" : "Start"}</button>
-      <button data-ck="one" ${clk.on ? "" : "disabled"}>Eins</button>
-      <button class="tap" data-ck="tap" ${live ? "disabled" : ""}>TAP</button>
-      <button data-ck="-1" ${live || !st.bpm ? "disabled" : ""}>−</button>
-      <button data-ck="1" ${live || !st.bpm ? "disabled" : ""}>+</button>
-      ${tapDiff && !live ? `<button data-ck="save">${clk.tapBpm} als Songtempo</button>` : ""}
-    </div>
+    ${ctl}
     <p class="hint">${live ? "Tempo kommt vom MC8 (MIDI-Clock). Tap am MC8 ändert es hier mit." :
       "Läuft mit dem Songtempo oder deinem Tap hier. Sobald der MC8 seine MIDI-Clock ans iPad schickt, übernimmt er."}
       „Eins“ macht den aktuellen Schlag zur Eins von Takt 1 – zum Beispiel beim Einzählen.</p>`;
@@ -1172,6 +1189,8 @@ $("pClick").addEventListener("click", (e) => {
     let bars = 0; for (let i = 0; i < +go.dataset.goto; i++) bars += map[i].bars * map[i].rep;
     downbeat(); clk.offset -= bars * beatsPerBar(); clk.last = ""; return;
   }
+  const v = e.target.closest("[data-ckview]");
+  if (v) { setting("stage-click-view", v.dataset.ckview); renderClick(); return; }
   const b = e.target.closest("[data-ck]");
   if (!b || b.disabled) return;
   const a = b.dataset.ck;
