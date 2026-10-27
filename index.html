@@ -159,6 +159,9 @@
     margin:0 0 16px; overflow:hidden; }
   .ckflash i { position:absolute; inset:0; opacity:0; background:var(--fg); }
   .ckflash.one i { background:var(--accent); }
+  /* schwarze Schlagzahl: nur sichtbar, solange die Fläche leuchtet */
+  .ckflash b { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; color:#000;
+    font-size:min(42vh, 40vw); font-weight:800; line-height:1; font-variant-numeric:tabular-nums; }
 
   /* ---------- GRIFFE ---------- */
   .cgrid { display:grid; grid-template-columns:repeat(auto-fill, minmax(160px, 1fr)); gap:14px; }
@@ -1116,7 +1119,7 @@ function drawClick() {   // pro Bild: kleine Anzeige im Kopf und (falls offen) d
     $("edge").classList.toggle("one", st.beat === 0);
     document.querySelectorAll(".ckbeats div").forEach((d, i) => d.classList.toggle("hit", i === st.beat));
     const fl = document.querySelector(".ckflash");
-    if (fl) fl.classList.toggle("one", st.beat === 0);
+    if (fl) { fl.classList.toggle("one", st.beat === 0); fl.querySelector("b").textContent = st.beat + 1; }
     if (page === "click") clickPos(st);
   }
   const fade = 1 - 0.75 * Math.min(1, st.phase * 1.6);   // aufleuchten und abklingen
@@ -1163,7 +1166,7 @@ function renderClick() {
       <div class="seg"><button data-ckview="beats" class="${flash ? "" : "on"}">Felder</button><button data-ckview="flash" class="${flash ? "on" : ""}">Fläche</button></div>
     </div>`;
   if (flash) {
-    $("pClick").innerHTML = `<div class="ckflash"><i></i></div>${ctl}`;
+    $("pClick").innerHTML = `<div class="ckflash"><i></i><b></b></div>${ctl}`;
     clk.shape = ""; clk.last = ""; drawClick(); return;
   }
   $("pClick").innerHTML = `
