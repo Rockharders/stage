@@ -392,8 +392,17 @@ $("file").onchange = async (e) => {
   const files = [...e.target.files];
   if (!files.length) return;
   const loaded = [];
-  let restored = 0, suggested = null;
+  let restored = 0, suggested = null, audio = 0;
+  const unmatched = [], isAudio = (f) => /^audio\//.test(f.type) || /\.(mp3|m4a|wav|aac)$/i.test(f.name);
+  files.sort((a, b) => isAudio(a) - isAudio(b));   // Audio zuletzt – Vorschläge legen evtl. erst die Songs an
   for (const f of files) {
+    if (isAudio(f)) {   // Song-Audio: per Dateiname dem Song zuordnen
+      const key = songKey({ title: f.name.replace(/\.[^.]+$/, "") });
+      if (songs.some(x => songKey(x) === key)) {
+        try { await idb.put(key, { blob: f, name: f.name }); audio++; if (pl.key === key) pl.key = null; } catch (err) { unmatched.push(f.name); }
+      } else unmatched.push(f.name);
+      continue;
+    }
     const text = await f.text();
     let backup = null;
     try { backup = JSON.parse(text); } catch (err) {}
@@ -406,7 +415,9 @@ $("file").onchange = async (e) => {
   renderList();
   $("hint").textContent = [loaded.length ? loaded.length + " Song(s) geladen." : "",
                            restored ? "Sicherung geladen." : "",
-                           suggested ? `Vorschläge: ${suggested.filled} Song(s) ergänzt, ${suggested.added} neu angelegt – Vorhandenes bleibt.` : ""].filter(Boolean).join(" ");
+                           suggested ? `Vorschläge: ${suggested.filled} Song(s) ergänzt, ${suggested.added} neu angelegt – Vorhandenes bleibt.` : "",
+                           audio ? `${audio} Song-Audio(s) gespeichert.` : "",
+                           unmatched.length ? `Ohne passenden Song: ${unmatched.join(", ")}` : ""].filter(Boolean).join(" ");
   e.target.value = "";
 };
 function importBackup(b) {
