@@ -119,6 +119,20 @@
   .part .stepper b { min-width:0; font-size:18px; white-space:nowrap; }
   .part .stepper button, .part .mv button { padding:6px 12px; font-size:16px; }
   .part .mv { display:flex; gap:6px; }
+  /* Abspielen zum Prüfen: Song-Audio + Click über der Songmap */
+  .mplayer { display:flex; flex-wrap:wrap; align-items:center; gap:10px 14px; background:var(--panel); border-radius:14px;
+    padding:10px 12px; margin:0 0 16px; }
+  .mplayer .play { width:56px; height:48px; padding:0; font-size:22px; }
+  .mplayer .t { font-variant-numeric:tabular-nums; color:var(--dim); }
+  .mplayer .pos { flex:1; min-width:140px; font-size:19px; font-weight:600; }
+  .mplayer button.on { background:var(--accent); border-color:var(--accent); color:#000; font-weight:600; }
+  .mplayer .hint { flex-basis:100%; margin:0; font-size:14px; }
+  .plmap { position:relative; }
+  .plmap .head { position:absolute; top:-5px; bottom:-5px; width:3px; margin-left:-1px; background:#fff; border-radius:2px;
+    box-shadow:0 0 0 2px #000; pointer-events:none; }
+  .part.playing { outline:2px solid var(--fg); }
+  .bars div.now { outline:3px solid var(--fg); outline-offset:-1px; }
+  .bars div[data-bar] { cursor:pointer; }
   .mapgrid .lab { cursor:pointer; display:flex; align-items:baseline; gap:10px; margin:18px 0 8px; font-size:20px; font-weight:700; }
   .mapgrid .lab small { color:var(--dim); font-size:15px; font-weight:500; }
   .mapgrid .lab .nt { color:var(--dim); font-size:15px; font-weight:400; }
@@ -265,6 +279,7 @@
     <button id="load">Laden …</button>
     <button id="backup">Sichern</button>
     <input type="file" id="file" multiple>
+    <input type="file" id="plFile" accept="audio/*,.mp3,.m4a,.wav">
   </div>
   <div id="songs"></div>
   <p class="hint" id="hint"></p>
@@ -377,19 +392,21 @@ $("file").onchange = async (e) => {
   const files = [...e.target.files];
   if (!files.length) return;
   const loaded = [];
-  let restored = 0;
+  let restored = 0, suggested = null;
   for (const f of files) {
     const text = await f.text();
     let backup = null;
     try { backup = JSON.parse(text); } catch (err) {}
     // „buehne“ = Sicherungen vor der Umbenennung in Stagehand
-    if (backup && (backup.app === "stagehand" || backup.app === "buehne")) { importBackup(backup); restored++; }
+    if (backup && backup.app === "stagehand" && backup.kind === "vorschlag") { suggested = importSuggestion(backup); }
+    else if (backup && (backup.app === "stagehand" || backup.app === "buehne")) { importBackup(backup); restored++; }
     else loaded.push(parse(f.name, text));
   }
   if (loaded.length) mergeSongs(loaded);
   renderList();
   $("hint").textContent = [loaded.length ? loaded.length + " Song(s) geladen." : "",
-                           restored ? "Sicherung geladen." : ""].filter(Boolean).join(" ");
+                           restored ? "Sicherung geladen." : "",
+                           suggested ? `Vorschläge: ${suggested.filled} Song(s) ergänzt, ${suggested.added} neu angelegt – Vorhandenes bleibt.` : ""].filter(Boolean).join(" ");
   e.target.value = "";
 };
 function importBackup(b) {
@@ -398,6 +415,27 @@ function importBackup(b) {
     if (!data.songs[k] || (v.updated || 0) >= (data.songs[k].updated || 0)) data.songs[k] = v;   // neuere Fassung gewinnt
   }
   saveData();
+}
+
+// Vorschlagsdatei (z. B. aus Suno): Tempo, Takt, Songmap, Taktraster – nur dort, wo noch nichts eingetragen ist
+function importSuggestion(b) {
+  let added = 0, filled = 0;
+  for (const s of b.songs || []) {
+    const key = songKey(s);
+    let song = songs.find(x => songKey(x) === key);
+    if (!song) { song = { nr: s.nr || 0, title: s.title, tempo: "", key: "", scenes: [], info: [], sections: [] }; songs.push(song); added++; }
+    const d = data.songs[key] || (data.songs[key] = { updated: 0, guitar: "", tuning: "std", capo: 0, notes: "", chords: [], tabs: [] });
+    let changed = false;
+    if (!d.tempo && !song.tempo && s.tempo) { d.tempo = String(s.tempo); changed = true; }
+    const takt = [...(song.info || []), ...(d.fields || []).map(f => [f.k, f.v])].some(([k]) => /^takt$/i.test(String(k).trim()));
+    if (!takt && s.time) { (d.fields = d.fields || []).push({ k: "Takt", v: s.time }); changed = true; }
+    if (!(d.map && d.map.length) && s.map) { d.map = s.map; changed = true; }
+    if (!d.grid && s.grid) { d.grid = s.grid; changed = true; }
+    if (changed) { d.updated = Date.now(); filled++; }
+  }
+  songs.sort((a, b) => a.nr - b.nr || a.title.localeCompare(b.title));
+  save(); saveData();
+  return { added, filled };
 }
 
 // ---------- Sichern ----------
@@ -621,6 +659,7 @@ function highlight(scroll = true) {
 function openSong(i) {
   if (i < 0 || i >= songs.length) return;
   current = i; section = 0;
+  plStop(); pl.key = null; pl.buf = null;
   clickSong();
   document.body.classList.remove("listing");
   ["editor", "picker", "textbox", "lyrics"].forEach(id => $(id).classList.remove("open"));
@@ -885,9 +924,9 @@ function renderMap() {
   const fromText = sections().filter(x => x.label).length;
   const grid = setting("stage-map-view") === "grid";
   $("pMap").innerHTML = `<div class="tabmode"><div class="seg"><button data-view="list" class="${grid ? "" : "on"}">Liste</button>` +
-    `<button data-view="grid" class="${grid ? "on" : ""}">Raster</button></div></div>` + (map.length ? `
-    <div class="mapbar">${map.map((p, i) => `<a href="#" data-goto="${i}" style="flex:${p.bars * p.rep};background:${partColor(p.name)}">
-      ${esc(p.name || "–")}<small>${p.bars}${p.rep > 1 ? " × " + p.rep : ""}</small></a>`).join("")}</div>
+    `<button data-view="grid" class="${grid ? "on" : ""}">Raster</button></div></div>` + playerHTML() + (map.length ? `
+    <div class="mapbar plmap">${map.map((p, i) => `<a href="#" data-goto="${i}" style="flex:${p.bars * p.rep};background:${partColor(p.name)}">
+      ${esc(p.name || "–")}<small>${p.bars}${p.rep > 1 ? " × " + p.rep : ""}</small></a>`).join("")}<i class="head" id="plHead" style="display:none"></i></div>
     <p class="maptotal"><b>${bars} Takte</b>${secs ? ` · ≈ ${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, "0")} bei ${bpm} BPM` : ""}</p>` :
     `<p class="empty">Noch keine Songmap. Teile unten antippen – oder aus dem Songtext übernehmen.</p>`) +
     (grid ? mapGrid(map) : map.map((p, i) => `<div class="part" id="part${i}" data-i="${i}"><div class="clr" style="background:${partColor(p.name)}"></div><div class="body">
@@ -904,6 +943,7 @@ function renderMap() {
     <div class="field" style="margin-top:22px"><span class="cap">Teil anhängen</span><div class="chips">
       ${PARTS.map(n => `<button class="chip" data-add="${n}">+ ${n}</button>`).join("")}
       ${!map.length && fromText ? `<button class="chip" data-a="fromtext">Aus Songtext (${fromText} Teile)</button>` : ""}</div></div>`);
+  plLast = ""; loadTrack(); plDraw();
 }
 // Raster: eine Kachel pro Takt, durchgezählt über den ganzen Song
 function mapGrid(map) {
@@ -914,7 +954,7 @@ function mapGrid(map) {
     for (let r = 0; r < p.rep; r++) {
       if (r) tiles += `<div class="again">Wiederholung ${r + 1}</div>`;
       for (let b = 0; b < p.bars; b++) {
-        tiles += `<div style="border-color:${col};background:${col}2e"><small>${++n}</small></div>`;
+        tiles += `<div data-bar="${n}" style="border-color:${col};background:${col}2e"><small>${++n}</small></div>`;
       }
     }
     return `<div class="lab" id="glab${i}" data-edit="${i}"><span style="color:${col}">${esc(p.name || "–")}</span>
@@ -926,8 +966,16 @@ $("pMap").addEventListener("click", (e) => {
   const u = ud(), map = u.map = u.map || [];
   const v = e.target.closest("[data-view]");
   if (v) { setting("stage-map-view", v.dataset.view); renderMap(); return; }
+  const pb = e.target.closest("[data-pl]");
+  if (pb) { plAction(pb.dataset.pl, pb); return; }
   const go = e.target.closest("[data-goto]");
-  if (go) { e.preventDefault(); ($("part" + go.dataset.goto) || $("glab" + go.dataset.goto)).scrollIntoView({ behavior: "smooth", block: "center" }); return; }
+  if (go) {   // mit Audio: dorthin springen, sonst zum Teil scrollen
+    e.preventDefault();
+    if (pl.buf) { plSeek(barStart(partStartBar(+go.dataset.goto))); return; }
+    ($("part" + go.dataset.goto) || $("glab" + go.dataset.goto)).scrollIntoView({ behavior: "smooth", block: "center" }); return;
+  }
+  const tile = e.target.closest("[data-bar]");
+  if (tile && pl.buf) { plSeek(barStart(+tile.dataset.bar)); return; }
   const ed = e.target.closest("[data-edit]");
   if (ed) {   // Teilname im Raster antippen: zur Liste, dort lässt er sich bearbeiten
     setting("stage-map-view", "list"); renderMap();
@@ -964,6 +1012,168 @@ $("pMap").addEventListener("input", (e) => {
     if (seg) { seg.style.background = partColor(p.name); seg.firstChild.textContent = p.name || "–"; }
   }
 });
+
+// ---------- Songmap prüfen: Song-Audio (MP3) abspielen, Click dazu, Position in der Songmap ----------
+// Audio pro Song im Gerätespeicher (IndexedDB), Abspielen über Web Audio – Click und Musik laufen auf derselben Uhr.
+const idb = (() => {
+  let dbp = null;
+  const open = () => dbp || (dbp = new Promise((res, rej) => {
+    const r = indexedDB.open("stagehand-audio", 1);
+    r.onupgradeneeded = () => r.result.createObjectStore("tracks");
+    r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error);
+  }));
+  const run = async (mode, fn) => {
+    const db = await open();
+    return new Promise((res, rej) => {
+      const t = db.transaction("tracks", mode), q = fn(t.objectStore("tracks"));
+      t.oncomplete = () => res(q.result); t.onerror = () => rej(t.error);
+    });
+  };
+  return { get: (k) => run("readonly", st => st.get(k)), put: (k, v) => run("readwrite", st => st.put(v, k)),
+           del: (k) => run("readwrite", st => st.delete(k)) };
+})();
+const pl = { key: null, buf: null, name: "", ctx: null, src: null, playing: false, startedAt: 0, offset: 0,
+             click: setting("stage-map-click") !== "0", sched: -1, raf: 0, loading: false };
+const plCtx = () => pl.ctx || (pl.ctx = new (window.AudioContext || window.webkitAudioContext)());
+const plPos = () => pl.playing ? pl.ctx.currentTime - pl.startedAt : pl.offset;
+const fmt = (t) => Math.floor(t / 60) + ":" + String(Math.floor(t % 60)).padStart(2, "0");
+// Takt-Anfänge: Sunos Raster (ud().grid) oder gleichmäßig aus Tempo und Taktart
+function barStart(k) {
+  const g = ud().grid;
+  if (g && g.length > 1) {
+    if (k < g.length) return g[Math.max(0, k)];
+    const len = (g[g.length - 1] - g[0]) / (g.length - 1);
+    return g[g.length - 1] + (k - g.length + 1) * len;
+  }
+  const bpm = parseFloat(val("tempo", songs[current].tempo)) || 120;
+  return k * beatsPerBar() * 60 / bpm;
+}
+function barAtTime(t) {   // Takt (0-basiert, mit Anteil); vor dem ersten Takt negativ
+  let lo = 0, hi = 4000;
+  if (t < barStart(0)) return (t - barStart(0)) / (barStart(1) - barStart(0));
+  while (hi - lo > 1) { const mid = (lo + hi) >> 1; if (barStart(mid) <= t) lo = mid; else hi = mid; }
+  return lo + (t - barStart(lo)) / (barStart(lo + 1) - barStart(lo));
+}
+const partStartBar = (i) => (ud().map || []).slice(0, i).reduce((n, p) => n + p.bars * p.rep, 0);
+function partAt(bar) {
+  const map = ud().map || [];
+  let start = 0;
+  for (let i = 0; i < map.length; i++) {
+    const len = map[i].bars * map[i].rep;
+    if (bar < start + len) return { i, p: map[i], pos: bar - start };
+    start += len;
+  }
+  return null;
+}
+function playerHTML() {
+  if (!pl.buf) return `<div class="mplayer"><button data-pl="load">♪ Song-Audio laden</button>
+    <span class="t">${pl.loading ? "lädt …" : "MP3 des Songs – dann läuft die Songmap mit, mit Click zum Prüfen."}</span></div>`;
+  return `<div class="mplayer"><button class="play primary" data-pl="play" id="plPlay">${pl.playing ? "❚❚" : "▶"}</button>
+    <span class="pos" id="plPos"></span><span class="t" id="plTime"></span>
+    <button data-pl="click" class="${pl.click ? "on" : ""}">Click</button>
+    <button data-pl="back">−1 Takt</button><button data-pl="fwd">+1 Takt</button>
+    <button class="danger" data-pl="rm">Audio entfernen</button>
+    <p class="hint">${esc(pl.name)}${ud().grid ? " · Taktraster von Suno" : " · Taktraster aus dem Tempo"} – Teil oder Takt antippen = dorthin springen.</p></div>`;
+}
+async function loadTrack() {
+  if (current === null) return;
+  const key = songKey(songs[current]);
+  if (pl.key === key) return;
+  plStop(); pl.key = key; pl.buf = null; pl.offset = 0;
+  try {
+    const rec = await idb.get(key);
+    if (rec && pl.key === key) { pl.loading = true; await plDecode(rec.blob, rec.name); }
+  } catch (e) {}
+  pl.loading = false;
+  if (page === "map" && pl.key === key) renderMap();
+}
+async function plDecode(blob, name) {
+  const buf = await blob.arrayBuffer();
+  pl.buf = await new Promise((res, rej) => plCtx().decodeAudioData(buf, res, rej));
+  pl.name = name || "";
+}
+function plStop() {
+  if (pl.src) { try { pl.src.onended = null; pl.src.stop(); } catch (e) {} pl.src = null; }
+  if (pl.playing) pl.offset = plPos();
+  pl.playing = false; cancelAnimationFrame(pl.raf); pl.raf = 0;
+}
+function plPlay() {
+  const ctx = plCtx(); ctx.resume();
+  if (pl.offset >= pl.buf.duration - 0.05) pl.offset = 0;
+  const src = ctx.createBufferSource(); src.buffer = pl.buf; src.connect(ctx.destination);
+  pl.startedAt = ctx.currentTime - pl.offset; src.start(0, pl.offset);
+  src.onended = () => { if (pl.src === src) { pl.src = null; pl.playing = false; pl.offset = 0; renderMap(); } };
+  pl.src = src; pl.playing = true; pl.sched = pl.offset - 0.001;
+  plLoop();
+}
+function plSeek(t) {
+  const was = pl.playing;
+  plStop(); pl.offset = Math.max(0, Math.min(t, (pl.buf ? pl.buf.duration : 0) - 0.05));
+  if (was) plPlay(); else plDraw();
+}
+function plBeep(when, accent) {   // kurzer Click auf derselben Uhr wie die Musik
+  const ctx = pl.ctx, o = ctx.createOscillator(), g = ctx.createGain();
+  o.frequency.value = accent ? 1760 : 1100;
+  g.gain.setValueAtTime(0.0001, when); g.gain.exponentialRampToValueAtTime(accent ? 0.6 : 0.35, when + 0.002);
+  g.gain.exponentialRampToValueAtTime(0.0001, when + 0.05);
+  o.connect(g); g.connect(ctx.destination); o.start(when); o.stop(when + 0.06);
+}
+function plLoop() {
+  cancelAnimationFrame(pl.raf);
+  if (!pl.playing) return;
+  if (pl.click) {   // Schläge der nächsten 0,25 s vorausplanen
+    const now = plPos(), m = beatsPerBar(), k0 = Math.floor(barAtTime(now));
+    for (let k = Math.max(0, k0); k <= k0 + 1; k++) {
+      const a = barStart(k), b = barStart(k + 1);
+      for (let j = 0; j < m; j++) {
+        const bt = a + j * (b - a) / m;
+        if (bt > pl.sched && bt >= now - 0.005 && bt < now + 0.25) { plBeep(pl.startedAt + bt, j === 0); pl.sched = bt; }
+      }
+    }
+  }
+  plDraw();
+  pl.raf = requestAnimationFrame(plLoop);
+}
+let plLast = "";
+function plDraw() {   // Zeit, Takt/Teil, Kopf auf der Leiste, aktuelle Karte bzw. Kachel
+  if (page !== "map" || !pl.buf) return;
+  const t = plPos(), bar = barAtTime(t), whole = Math.floor(bar), here = whole >= 0 ? partAt(whole) : null;
+  const total = (ud().map || []).reduce((n, p) => n + p.bars * p.rep, 0);
+  if ($("plTime")) $("plTime").textContent = fmt(t) + " / " + fmt(pl.buf.duration);
+  const head = $("plHead");
+  if (head && total) { head.style.display = ""; head.style.left = Math.max(0, Math.min(100, bar / total * 100)) + "%"; }
+  const key = whole + "|" + (here ? here.i : -1);
+  if (key === plLast) return;
+  plLast = key;
+  if ($("plPos")) $("plPos").textContent = whole < 0 ? "Vorlauf" : here ?
+    `Takt ${whole + 1} · ${here.p.name || "–"} ${here.pos % here.p.bars + 1}/${here.p.bars}` + (here.p.rep > 1 ? ` (${Math.floor(here.pos / here.p.bars) + 1}.)` : "") :
+    `Takt ${whole + 1} · nach der Songmap`;
+  document.querySelectorAll(".part.playing, .bars div.now").forEach(el => el.classList.remove("playing", "now"));
+  if (here) { const c = $("part" + here.i); if (c) c.classList.add("playing"); }
+  const tile = document.querySelector(`.bars [data-bar="${whole}"]`); if (tile) tile.classList.add("now");
+}
+function plAction(a, b) {
+  if (a === "load") return $("plFile").click();
+  if (!pl.buf) return;
+  if (a === "play") { if (pl.playing) plStop(); else plPlay(); b.textContent = pl.playing ? "❚❚" : "▶"; plLast = ""; plDraw(); return; }
+  if (a === "click") { pl.click = !pl.click; setting("stage-map-click", pl.click ? "1" : "0"); b.classList.toggle("on", pl.click); pl.sched = plPos(); return; }
+  if (a === "back" || a === "fwd") { const k = Math.floor(barAtTime(plPos()) + 0.02) + (a === "fwd" ? 1 : -1); plSeek(barStart(Math.max(0, k))); return; }
+  if (a === "rm") {
+    if (!b.classList.contains("armed")) { b.classList.add("armed"); b.textContent = "Wirklich entfernen?"; return; }
+    plStop(); pl.buf = null; idb.del(pl.key).catch(() => {}); renderMap();
+  }
+}
+$("plFile").onchange = async (e) => {
+  const f = e.target.files[0]; e.target.value = "";
+  if (!f || current === null) return;
+  plStop(); pl.loading = true; pl.buf = null; renderMap();
+  try {
+    await plDecode(f, f.name);
+    pl.offset = 0;
+    idb.put(pl.key, { blob: f, name: f.name }).catch(() => {});   // bleibt auf dem Gerät für das nächste Mal
+  } catch (err) { alert("Diese Datei kann ich nicht abspielen: " + f.name); }
+  pl.loading = false; renderMap();
+};
 
 // TABS
 let tabSel = {};   // gewählter Schritt pro Tab
