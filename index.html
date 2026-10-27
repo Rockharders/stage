@@ -70,6 +70,9 @@
   #pText section.current { color:var(--fg); border-left-color:var(--accent); background:var(--panel); }
   .label { font-size:14px; letter-spacing:.12em; text-transform:uppercase; color:var(--accent); margin-bottom:6px; }
   #pText section p { margin:0; white-space:pre-wrap; }
+  #pText .edited { margin:18px 0 0; font-size:15px; color:var(--dim); }
+  #lyrics textarea { min-height:62vh; font-size:20px; line-height:1.45; }
+  #lyrics .hint { margin:10px 0 0; font-size:15px; }
   .note { color:var(--dim); font-style:italic; }
 
   /* ---------- INFO ---------- */
@@ -246,7 +249,7 @@
     <h1 id="title">Songs</h1>
     <span class="meta" id="meta"></span>
     <button class="clickbtn" id="clickBtn" aria-label="Click an/aus">Click</button>
-    <div class="size"><button id="smaller" aria-label="Schrift kleiner">A−</button><button id="bigger" aria-label="Schrift größer">A+</button></div>
+    <div class="size"><button id="smaller" aria-label="Schrift kleiner">A−</button><button id="bigger" aria-label="Schrift größer">A+</button><button id="editText">Bearbeiten</button></div>
     <button id="toggleList">Songs</button>
   </div>
   <nav class="pages" id="pages">
@@ -276,6 +279,14 @@
 <div id="edge"><i></i><i></i></div>
 <div class="sheet" id="editor"><div class="box"></div></div>
 <div class="sheet" id="picker"><div class="box"><h3></h3><div class="ptech"></div><div class="pgrid"></div></div></div>
+<div class="sheet" id="lyrics"><div class="box">
+  <div class="tabhead" style="padding:0 0 12px"><b class="grow">Text bearbeiten</b>
+    <button class="danger" id="lyOrig">Original wiederherstellen</button><button id="lyCancel">Abbrechen</button>
+    <button class="primary" id="lyDone">Fertig</button></div>
+  <textarea id="lyText" autocapitalize="sentences" spellcheck="false"></textarea>
+  <p class="hint">Jeder Teil beginnt mit seinem Namen in eckigen Klammern, z. B. [Strophe] oder [Refrain] – danach die Zeilen.
+    Szenen vom MC8 springen zum Teil, dessen Name so anfängt.</p>
+</div></div>
 <div class="sheet" id="textbox"><div class="box">
   <div class="tabhead" style="padding:0 0 12px"><b class="grow" id="tbTitle"></b><button id="tbCopy">Kopieren</button>
     <button id="tbSave">Als Datei</button><button class="primary" id="tbClose">Fertig</button></div>
@@ -558,16 +569,42 @@ function setPage(p) {
 $("pages").onclick = (e) => { const b = e.target.closest("button"); if (b) setPage(b.dataset.p); };
 
 // TEXT
+// Text des Songs: am iPad geänderte Fassung (ud().text) vor der aus der Datei
+const sectionsToText = (secs) => secs.map(x => (x.label ? "[" + x.label + "]\n" : "") + x.lines.join("\n")).join("\n\n");
+const sections = () => typeof ud().text === "string" ? parse("x.txt", ud().text).sections : songs[current].sections;
 function renderSong() {
   const s = songs[current];
   if (!s) return;
   $("title").textContent = s.title;
   renderMeta();
-  $("pText").innerHTML = s.sections.length ? s.sections.map((sec, i) =>
+  const secs = sections();
+  section = Math.min(section, Math.max(0, secs.length - 1));
+  $("pText").innerHTML = (secs.length ? secs.map((sec, i) =>
     `<section data-i="${i}">${sec.label ? `<div class="label">${esc(sec.label)}</div>` : ""}<p>${esc(sec.lines.join("\n"))}</p></section>`).join("")
-    : `<p class="note">Kein Text vorhanden.</p>`;
+    : `<p class="note">Kein Text vorhanden.</p>`) +
+    (typeof ud().text === "string" ? `<p class="edited">Text am iPad geändert.</p>` : "");
   highlight(false);
 }
+$("editText").onclick = () => {
+  if (current === null) return;
+  const u = ud();
+  $("lyText").value = typeof u.text === "string" ? u.text : sectionsToText(songs[current].sections);
+  $("lyOrig").style.display = typeof u.text === "string" ? "" : "none";
+  $("lyOrig").classList.remove("armed"); $("lyOrig").textContent = "Original wiederherstellen";
+  $("lyrics").classList.add("open");
+  $("lyText").scrollTop = 0;
+};
+$("lyCancel").onclick = () => $("lyrics").classList.remove("open");
+$("lyDone").onclick = () => {
+  const u = ud(), t = $("lyText").value.replace(/\s+$/, "");
+  if (t === sectionsToText(songs[current].sections)) delete u.text; else u.text = t;   // unverändert = Original
+  touch(); $("lyrics").classList.remove("open"); renderSong();
+};
+$("lyOrig").onclick = (e) => {
+  const b = e.currentTarget;
+  if (!b.classList.contains("armed")) { b.classList.add("armed"); b.textContent = "Wirklich? Deine Fassung geht verloren"; return; }
+  delete ud().text; touch(); $("lyrics").classList.remove("open"); renderSong();
+};
 function renderMeta() {
   const s = songs[current], tempo = val("tempo", s.tempo);
   $("meta").textContent = [val("key", s.key), tempo ? tempo + " BPM" : ""].filter(Boolean).join(" · ");
@@ -584,7 +621,7 @@ function openSong(i) {
   current = i; section = 0;
   clickSong();
   document.body.classList.remove("listing");
-  ["editor", "picker", "textbox"].forEach(id => $(id).classList.remove("open"));
+  ["editor", "picker", "textbox", "lyrics"].forEach(id => $(id).classList.remove("open"));
   renderSong(); renderList(); setPage("text");   // Songwechsel landet immer beim Text
 }
 function openSongNr(nr) {
@@ -595,9 +632,10 @@ function scene(n) {
   const s = songs[current];
   if (!s || !sceneName(n)) return;
   const want = sceneName(n).toLowerCase();
-  for (let step = 1; step <= s.sections.length; step++) {
-    const i = (section + step) % s.sections.length;
-    if (s.sections[i].label.toLowerCase().startsWith(want)) { section = i; break; }
+  const secs = sections();
+  for (let step = 1; step <= secs.length; step++) {
+    const i = (section + step) % secs.length;
+    if (secs[i].label.toLowerCase().startsWith(want)) { section = i; break; }
   }
   highlight();
 }
@@ -842,7 +880,7 @@ function renderMap() {
   const s = songs[current], u = ud(), map = u.map || [];
   const bars = map.reduce((n, p) => n + p.bars * p.rep, 0), bpm = parseFloat(val("tempo", s.tempo));
   const secs = bpm ? Math.round(bars * beatsPerBar() * 60 / bpm) : 0;
-  const fromText = s.sections.filter(x => x.label).length;
+  const fromText = sections().filter(x => x.label).length;
   const grid = setting("stage-map-view") === "grid";
   $("pMap").innerHTML = `<div class="tabmode"><div class="seg"><button data-view="list" class="${grid ? "" : "on"}">Liste</button>` +
     `<button data-view="grid" class="${grid ? "on" : ""}">Raster</button></div></div>` + (map.length ? `
@@ -898,7 +936,7 @@ $("pMap").addEventListener("click", (e) => {
   const card = b.closest(".part"), i = card ? +card.dataset.i : -1, p = map[i];
   if (b.dataset.add) map.push({ name: b.dataset.add, bars: /intro|outro/i.test(b.dataset.add) ? 4 : 8, rep: 1, chords: "", note: "" });
   else switch (b.dataset.a) {
-    case "fromtext": songs[current].sections.filter(x => x.label)
+    case "fromtext": sections().filter(x => x.label)
       .forEach(x => map.push({ name: x.label, bars: 8, rep: 1, chords: "", note: "" })); break;
     case "bars": p.bars = Math.max(1, Math.min(64, p.bars + +b.dataset.d)); break;
     case "rep": p.rep = Math.max(1, Math.min(16, p.rep + +b.dataset.d)); break;
