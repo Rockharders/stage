@@ -1141,7 +1141,13 @@ function plDraw() {   // Zeit, Takt/Teil, Kopf auf der Leiste, aktuelle Karte bz
   const total = (ud().map || []).reduce((n, p) => n + p.bars * p.rep, 0);
   if ($("plTime")) $("plTime").textContent = fmt(t) + " / " + fmt(pl.buf.duration);
   const head = $("plHead");
-  if (head && total) { head.style.display = ""; head.style.left = Math.max(0, Math.min(100, bar / total * 100)) + "%"; }
+  if (head && total) {   // im richtigen Block positionieren – die Blöcke sind wegen Abständen nicht ganz proportional
+    const segs = document.querySelectorAll(".plmap [data-goto]");
+    let x = 0;
+    if (here && segs[here.i]) x = segs[here.i].offsetLeft + segs[here.i].offsetWidth * (bar - partStartBar(here.i)) / (here.p.bars * here.p.rep);
+    else if (whole >= 0 && segs.length) x = segs[segs.length - 1].offsetLeft + segs[segs.length - 1].offsetWidth;
+    head.style.display = ""; head.style.left = x + "px";
+  }
   const key = whole + "|" + (here ? here.i : -1);
   if (key === plLast) return;
   plLast = key;
