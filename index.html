@@ -39,7 +39,8 @@
 
   .page { display:none; padding:20px 20px 40vh; }
   body:not(.listing)[data-page=text] #pText, body:not(.listing)[data-page=info] #pInfo,
-  body:not(.listing)[data-page=chords] #pChords, body:not(.listing)[data-page=tabs] #pTabs { display:block; }
+  body:not(.listing)[data-page=chords] #pChords, body:not(.listing)[data-page=tabs] #pTabs,
+  body:not(.listing)[data-page=map] #pMap { display:block; }
 
   /* ---------- Songliste ---------- */
   #list { display:none; padding:20px 20px 40px; }
@@ -84,6 +85,26 @@
   .stepper b { min-width:2.2em; text-align:center; font-size:22px; font-weight:500; }
   textarea { width:100%; min-height:38vh; background:var(--panel); border:1px solid var(--line); border-radius:12px;
     padding:14px 16px; font-size:20px; line-height:1.5; resize:vertical; }
+
+  /* ---------- SONGMAP ---------- */
+  .mapbar { display:flex; gap:3px; height:64px; margin:0 0 8px; }
+  .mapbar a { min-width:0; border-radius:8px; padding:8px 8px 0; color:#000; text-decoration:none; overflow:hidden;
+    font-size:15px; font-weight:700; line-height:1.15; white-space:nowrap; text-overflow:ellipsis; }
+  .mapbar a small { display:block; font-weight:500; opacity:.7; }
+  .maptotal { color:var(--dim); font-size:15px; margin:0 0 22px; }
+  .maptotal b { color:var(--fg); font-weight:600; }
+  .part { display:flex; background:var(--panel); border-radius:14px; margin:0 0 10px; overflow:hidden; }
+  .part .clr { flex:none; width:8px; }
+  .part .body { flex:1; min-width:0; padding:10px 14px 12px; display:flex; flex-direction:column; gap:8px; }
+  .part .top { display:flex; flex-wrap:wrap; align-items:center; gap:8px 14px; }
+  .part input { background:none; border:0; border-bottom:1px solid transparent; padding:4px 2px; outline:none; min-width:0; }
+  .part input:focus { border-bottom-color:var(--line); }
+  .part input.nm { flex:1 1 160px; font-size:24px; font-weight:600; }
+  .part input.ch { font-size:20px; }
+  .part input.nt { font-size:17px; color:var(--dim); }
+  .part .stepper b { min-width:0; font-size:18px; white-space:nowrap; }
+  .part .stepper button, .part .mv button { padding:6px 12px; font-size:16px; }
+  .part .mv { display:flex; gap:6px; }
 
   /* ---------- GRIFFE ---------- */
   .cgrid { display:grid; grid-template-columns:repeat(auto-fill, minmax(160px, 1fr)); gap:14px; }
@@ -139,13 +160,20 @@
   .tcol .c span { position:relative; min-width:30px; height:30px; padding:0 6px; border-radius:15px; background:var(--panel);
     display:flex; align-items:center; justify-content:center; font-size:19px; font-weight:600; }
   .tcol .c span.x { color:var(--mute); }
-  .tcol .c i { position:absolute; left:-9px; top:0; z-index:1; font:italic 600 15px/1 -apple-system,Helvetica,sans-serif;
-    color:var(--accent); }
+  /* Hammer/Pull: Bogen von Note zu Note, Slide: schräge Linie dazwischen, Bend/Vibrato über der Note */
+  .tcol .c .lg { position:absolute; top:1px; height:10px; border:2px solid var(--accent); border-bottom:0;
+    border-radius:50% 50% 0 0 / 100% 100% 0 0; }
+  .tcol .c .lg b { position:absolute; left:50%; top:-9px; transform:translateX(-50%); padding:0 3px; background:var(--panel);
+    font:italic 700 13px/1 -apple-system,Helvetica,sans-serif; color:var(--accent); }
+  .tcol .c .sl { position:absolute; top:50%; height:2.5px; background:var(--accent); border-radius:2px; }
+  .tcol .c .fx { position:absolute; left:50%; top:-4px; margin-left:6px; z-index:1; white-space:nowrap;
+    font:700 13px/1 -apple-system,Helvetica,sans-serif; color:var(--accent); }
   .tabmode { display:flex; justify-content:flex-end; margin:0 0 12px; }
   .seg { display:inline-flex; border:1px solid var(--line); border-radius:10px; overflow:hidden; }
   .seg button { border:0; border-radius:0; font-size:15px; padding:7px 16px; background:none; }
   .seg button.on { background:var(--accent); color:#000; font-weight:600; }
-  .ptech { display:flex; gap:8px; margin:0 0 14px; }
+  .ptech { display:flex; flex-wrap:wrap; gap:8px; margin:0 0 14px; }
+  .ptech .cap { flex-basis:100%; margin:0; }
   .ptech button { flex:1; font-size:16px; padding:10px 6px; }
   .ptech button.on { background:var(--accent); border-color:var(--accent); color:#000; font-weight:600; }
   .tcol.sel { background:rgba(198,255,61,.08); }
@@ -164,7 +192,7 @@
     <button id="toggleList">Songs</button>
   </div>
   <nav class="pages" id="pages">
-    <button data-p="text">TEXT</button><button data-p="info">INFO</button>
+    <button data-p="text">TEXT</button><button data-p="info">INFO</button><button data-p="map">SONGMAP</button>
     <button data-p="chords">GRIFFE</button><button data-p="tabs">TABS</button>
   </nav>
 </header>
@@ -181,6 +209,7 @@
 </div>
 <main class="page" id="pText"></main>
 <div class="page" id="pInfo"></div>
+<div class="page" id="pMap"></div>
 <div class="page" id="pChords"></div>
 <div class="page" id="pTabs"></div>
 </div>
@@ -420,7 +449,7 @@ function chordSVG(c, interactive) {
 
 // ---------- Bund-Auswahl ----------
 let pickCb = null;
-let pickTech = null;
+let pickTech = null;   // Zusatzzeilen im Tab: [{cap, opts[[k, lab]], cur, set(k)}]
 function pick(title, values, cur, cb, tech) {
   const lab = (v) => v === null ? "leer" : v === "x" ? "X" : v;
   $("picker").querySelector("h3").textContent = title;
@@ -432,15 +461,15 @@ function pick(title, values, cur, cb, tech) {
   $("picker").classList.add("open");
 }
 const FRETS = Array.from({ length: 25 }, (_, i) => i);
-function renderTech() {   // Übergang zur Note: Hammer-on/Pull-off oder Slide (nur im Tab)
+function renderTech() {
   const el = $("picker").querySelector(".ptech");
   el.style.display = pickTech ? "" : "none";
-  if (pickTech) el.innerHTML = TECHS.map(([k, lab]) =>
-    `<button data-tech="${k}" class="${(pickTech.cur || "") === k ? "on" : ""}">${lab}</button>`).join("");
+  if (pickTech) el.innerHTML = pickTech.map((row, r) => `<span class="cap">${row.cap}</span>` + row.opts.map(([k, lab]) =>
+    `<button data-row="${r}" data-tech="${k}" class="${(row.cur || "") === k ? "on" : ""}">${lab}</button>`).join("")).join("");
 }
 $("picker").onclick = (e) => {
   const t = e.target.closest("[data-tech]");
-  if (t) { pickTech.cur = t.dataset.tech || null; pickTech.cb(pickTech.cur); renderTech(); return; }
+  if (t) { const row = pickTech[+t.dataset.row]; row.cur = t.dataset.tech || null; row.set(row.cur); renderTech(); return; }
   const b = e.target.closest("button");
   if (b) pickCb(+b.dataset.i);
   if (b || e.target === e.currentTarget) $("picker").classList.remove("open");
@@ -460,6 +489,7 @@ function setPage(p) {
   document.querySelectorAll("#pages button").forEach(b => b.classList.toggle("on", b.dataset.p === p));
   if (current === null) return;
   if (p === "info") renderInfo();
+  if (p === "map") renderMap();
   if (p === "chords") renderChords();
   if (p === "tabs") renderTabs();
   $("scroll").scrollTop = 0;
@@ -730,23 +760,110 @@ $("editor").addEventListener("input", (e) => {
 });
 function closeEditor() { $("editor").classList.remove("open"); renderChords(); }
 
+// SONGMAP: Ablauf des Songs in Teilen – Name, Takte, Wiederholungen, Akkorde, Hinweis
+const PARTS = ["Intro", "Strophe", "Pre", "Refrain", "Bridge", "Solo", "Break", "Outro"];
+const PART_COLORS = [[/intro|outro|ende|end/, "#9aa5b1"], [/strophe|verse|vers/, "#4db8ff"], [/pre/, "#ffb02e"],
+  [/refrain|chorus|hook/, "#c6ff3d"], [/bridge|c-teil/, "#b48cff"], [/solo/, "#ff6b5e"], [/break|zwischen|inter/, "#2ec4b6"]];
+const partColor = (name) => (PART_COLORS.find(([re]) => re.test(name.toLowerCase())) || [0, "#8a8a92"])[1];
+function beatsPerBar() {   // aus dem Feld „Takt“ (Datei oder eigenes Feld), sonst 4/4
+  const s = songs[current], f = [...(s.info || []), ...(ud().fields || []).map(x => [x.k, x.v])]
+    .find(([k]) => /^takt$/i.test(k.trim()));
+  const m = f && String(f[1]).match(/(\d+)\s*\/\s*(\d+)/);
+  return m ? +m[1] / (+m[2] === 8 ? 2 : 1) : 4;
+}
+function renderMap() {
+  const s = songs[current], u = ud(), map = u.map || [];
+  const bars = map.reduce((n, p) => n + p.bars * p.rep, 0), bpm = parseFloat(val("tempo", s.tempo));
+  const secs = bpm ? Math.round(bars * beatsPerBar() * 60 / bpm) : 0;
+  const fromText = s.sections.filter(x => x.label).length;
+  $("pMap").innerHTML = (map.length ? `
+    <div class="mapbar">${map.map((p, i) => `<a href="#" data-goto="${i}" style="flex:${p.bars * p.rep};background:${partColor(p.name)}">
+      ${esc(p.name || "–")}<small>${p.bars}${p.rep > 1 ? " × " + p.rep : ""}</small></a>`).join("")}</div>
+    <p class="maptotal"><b>${bars} Takte</b>${secs ? ` · ≈ ${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, "0")} bei ${bpm} BPM` : ""}</p>` :
+    `<p class="empty">Noch keine Songmap. Teile unten antippen – oder aus dem Songtext übernehmen.</p>`) +
+    map.map((p, i) => `<div class="part" id="part${i}" data-i="${i}"><div class="clr" style="background:${partColor(p.name)}"></div><div class="body">
+      <div class="top">
+        <input class="nm" data-k="name" value="${esc(p.name)}" placeholder="Teil" autocomplete="off">
+        <span class="stepper"><button data-a="bars" data-d="-1">−</button><b>${p.bars} Takte</b><button data-a="bars" data-d="1">+</button></span>
+        <span class="stepper"><button data-a="rep" data-d="-1">−</button><b>× ${p.rep}</b><button data-a="rep" data-d="1">+</button></span>
+        <span class="mv"><button data-a="up" ${i ? "" : "disabled"}>↑</button><button data-a="down" ${i < map.length - 1 ? "" : "disabled"}>↓</button>
+          <button data-a="dup">Kopie</button><button class="danger" data-a="del">✕</button></span>
+      </div>
+      <input class="ch" data-k="chords" value="${esc(p.chords)}" placeholder="Akkorde, z. B. Am F C G" autocomplete="off">
+      <input class="nt" data-k="note" value="${esc(p.note)}" placeholder="Hinweis, z. B. Szene B, nur Bass, Break auf 4" autocomplete="off">
+    </div></div>`).join("") + `
+    <div class="field" style="margin-top:22px"><span class="cap">Teil anhängen</span><div class="chips">
+      ${PARTS.map(n => `<button class="chip" data-add="${n}">+ ${n}</button>`).join("")}
+      ${!map.length && fromText ? `<button class="chip" data-a="fromtext">Aus Songtext (${fromText} Teile)</button>` : ""}</div></div>`;
+}
+$("pMap").addEventListener("click", (e) => {
+  const u = ud(), map = u.map = u.map || [];
+  const go = e.target.closest("[data-goto]");
+  if (go) { e.preventDefault(); $("part" + go.dataset.goto).scrollIntoView({ behavior: "smooth", block: "center" }); return; }
+  const b = e.target.closest("button");
+  if (!b) return;
+  const card = b.closest(".part"), i = card ? +card.dataset.i : -1, p = map[i];
+  if (b.dataset.add) map.push({ name: b.dataset.add, bars: /intro|outro/i.test(b.dataset.add) ? 4 : 8, rep: 1, chords: "", note: "" });
+  else switch (b.dataset.a) {
+    case "fromtext": songs[current].sections.filter(x => x.label)
+      .forEach(x => map.push({ name: x.label, bars: 8, rep: 1, chords: "", note: "" })); break;
+    case "bars": p.bars = Math.max(1, Math.min(64, p.bars + +b.dataset.d)); break;
+    case "rep": p.rep = Math.max(1, Math.min(16, p.rep + +b.dataset.d)); break;
+    case "up": map.splice(i - 1, 0, map.splice(i, 1)[0]); break;
+    case "down": map.splice(i + 1, 0, map.splice(i, 1)[0]); break;
+    case "dup": map.splice(i + 1, 0, Object.assign({}, p)); break;
+    case "del":
+      if (!b.classList.contains("armed")) { b.classList.add("armed"); b.textContent = "Löschen?"; return; }
+      map.splice(i, 1); break;
+    default: return;
+  }
+  const y = $("scroll").scrollTop;
+  touch(); renderMap(); $("scroll").scrollTop = y;
+});
+$("pMap").addEventListener("input", (e) => {
+  const k = e.target.dataset.k, card = e.target.closest(".part");
+  if (!k || !card) return;
+  const p = ud().map[+card.dataset.i];
+  p[k] = e.target.value; touch();
+  if (k === "name") {   // Farbe und Übersicht gleich mitziehen, ohne das Feld neu zu bauen
+    card.querySelector(".clr").style.background = partColor(p.name);
+    const seg = document.querySelector(`.mapbar [data-goto="${card.dataset.i}"]`);
+    if (seg) { seg.style.background = partColor(p.name); seg.firstChild.textContent = p.name || "–"; }
+  }
+});
+
 // TABS
 let tabSel = {};   // gewählter Schritt pro Tab
 const emptyStep = () => ({ f: [null, null, null, null, null, null], bar: false });
 const TECHS = [["", "normal"], ["l", "Hammer / Pull"], ["s", "Slide"]];
-// Zeichen vor der Note: h/p bzw. / oder \ – je nachdem, ob die Note davor auf der Saite tiefer oder höher liegt
-function techMark(tb, si, s) {
+const EFFECTS = [["", "ohne"], ["b1", "Bend ½"], ["b2", "Bend 1"], ["v", "Vibrato"]];
+const COLW = 46;   // Breite eines Schritts (wie .tcol)
+// Übergang zur Note: h/p bzw. / oder \ – je nachdem, ob die Note davor auf der Saite tiefer oder höher liegt.
+// d = wie viele Schritte zurück diese Note liegt (dorthin reichen Bogen bzw. Linie)
+function techInfo(tb, si, s) {
   const t = (tb.steps[si].t || [])[s], cur = tb.steps[si].f[s];
-  if (!t || typeof cur !== "number") return "";
-  let prev = null;
-  for (let i = si - 1; i >= 0 && prev === null; i--) if (typeof tb.steps[i].f[s] === "number") prev = tb.steps[i].f[s];
+  if (!t || typeof cur !== "number") return null;
+  let prev = null, d = 1;
+  for (let i = si - 1; i >= 0; i--) if (typeof tb.steps[i].f[s] === "number") { prev = tb.steps[i].f[s]; d = si - i; break; }
   const down = prev !== null && prev > cur;
-  return t === "l" ? (down ? "p" : "h") : (down ? "\\" : "/");
+  return { t, d, down, mark: t === "l" ? (down ? "p" : "h") : (down ? "\\" : "/") };
+}
+const techMark = (tb, si, s) => (techInfo(tb, si, s) || { mark: "" }).mark;
+const fxOf = (st, s) => typeof st.f[s] === "number" ? (st.e || [])[s] || "" : "";
+function techHTML(tb, si, s) {
+  const ti = techInfo(tb, si, s);
+  if (!ti) return "";
+  const w = ti.d * COLW;
+  if (ti.t === "l") return `<i class="lg" style="left:${COLW / 2 - w + 8}px;width:${w - 16}px"><b>${ti.mark}</b></i>`;
+  return `<i class="sl" style="left:${COLW / 2 + 15 - w}px;width:${w - 30}px;transform:rotate(${ti.down ? 28 : -28}deg)"></i>`;
 }
 const tabNotes = () => setting("stage-tab-notes") === "1";
 function renderTabs() {
   const u = ud(), t = tuning(), names = stringNames(t), notes = tabNotes();
   const show = (v, s) => v === "x" ? "X" : notes ? NOTE[(t[s] + v) % 12] : v;
+  const fx = (st, s) => { const e = fxOf(st, s); if (!e) return "";
+    const up = e === "b1" ? 1 : 2;
+    return `<i class="fx">${e === "v" ? "∿∿" : "↗" + (notes ? NOTE[(t[s] + st.f[s] + up) % 12] : up === 1 ? "½" : "1")}</i>`; };
   $("pTabs").innerHTML = `<div class="tabmode"><div class="seg"><button data-mode="0" class="${notes ? "" : "on"}">Zahl</button>` +
     `<button data-mode="1" class="${notes ? "on" : ""}">Ton</button></div></div>` +
     (u.tabs.length ? "" : `<p class="empty">Noch keine Tabs für diesen Song.</p>`) +
@@ -756,7 +873,7 @@ function renderTabs() {
         <div class="tcol ${si === sel ? "sel" : ""} ${st.bar ? "bar" : ""}" data-t="${ti}" data-step="${si}">
           <div class="hd">${si + 1}</div><div class="cells">
           ${[5, 4, 3, 2, 1, 0].map(s => `<div class="c" data-str="${s}">${st.f[s] === null ? "" :
-            `<i>${techMark(tb, si, s)}</i><span class="${st.f[s] === "x" ? "x" : ""}">${show(st.f[s], s)}</span>`}</div>`).join("")}</div></div>`).join("");
+            `${techHTML(tb, si, s)}<span class="${st.f[s] === "x" ? "x" : ""}">${show(st.f[s], s)}</span>${fx(st, s)}`}</div>`).join("")}</div></div>`).join("");
       return `<div class="tabblock" data-t="${ti}">
         <div class="tabhead"><input value="${esc(tb.title)}" data-title="${ti}" placeholder="Name (z. B. Intro-Riff)">
           <button data-act="text">Als Text</button><button class="danger" data-act="del">Löschen</button></div>
@@ -783,11 +900,13 @@ $("pTabs").onclick = (e) => {
     tabSel[ti] = si;
     if (c) {
       const s = +c.dataset.str, step = u.tabs[ti].steps[si];
+      const setIn = (key) => (k) => { step[key] = step[key] || [null, null, null, null, null, null]; step[key][s] = k; touch(); renderTabs(); };
       pick("Schritt " + (si + 1) + " · Saite " + stringNames(tuning())[s], [null, "x", ...FRETS], step.f[s], (v) => {
-        step.f[s] = v; touch(); renderTabs();
-      }, { cur: (step.t || [])[s] || null, cb: (k) => {
-        step.t = step.t || [null, null, null, null, null, null]; step.t[s] = k; touch(); renderTabs();
-      } });
+        step.f[s] = v;
+        if (typeof v !== "number") { if (step.t) step.t[s] = null; if (step.e) step.e[s] = null; }
+        touch(); renderTabs();
+      }, [{ cap: "Von der Note davor", opts: TECHS, cur: (step.t || [])[s] || null, set: setIn("t") },
+          { cap: "Auf der Note", opts: EFFECTS, cur: (step.e || [])[s] || null, set: setIn("e") }]);
     }
     renderTabs(); return;
   }
@@ -814,7 +933,8 @@ $("pTabs").addEventListener("input", (e) => {
 });
 function tabText(tb) {
   const names = stringNames(tuning());
-  const cell = (i, s) => { const v = tb.steps[i].f[s]; return v === null ? "" : v === "x" ? "x" : techMark(tb, i, s) + v; };
+  const cell = (i, s) => { const st = tb.steps[i], v = st.f[s], e = fxOf(st, s);
+    return v === null ? "" : v === "x" ? "x" : techMark(tb, i, s) + v + (e === "v" ? "~" : e ? "b" + (v + (e === "b1" ? 1 : 2)) : ""); };
   const w = tb.steps.map((st, i) => Math.max(1, ...[0, 1, 2, 3, 4, 5].map(s => cell(i, s).length)));
   return [5, 4, 3, 2, 1, 0].map(s => names[s].padEnd(2) + "|-" + tb.steps.map((st, i) => {
     const v = cell(i, s);
