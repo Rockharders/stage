@@ -501,6 +501,7 @@ async function importAudioPack(f) {
     if (t.grid) {   // Fassung mit konstantem Tempo (konstant_pack.py): Raster und Tempo gehören zur Datei, Versatz entfällt
       const d = data.songs[key] || (data.songs[key] = { updated: 0, guitar: "", tuning: "std", capo: 0, notes: "", chords: [], tabs: [] });
       d.grid = t.grid; d.gridSrc = t.gridSrc; d.tempo = String(t.tempo); delete d.audioShift; d.updated = Date.now();
+      if (t.map) d.map = t.map;   // Songmap auf bereinigte Takte (Sunos Raster war unregelmäßig)
     }
   }
   saveData();
