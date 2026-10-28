@@ -408,6 +408,10 @@ $("file").onchange = async (e) => {
       } else unmatched.push(f.name);
       continue;
     }
+    if (await f.slice(0, 17).text() === "STAGEHAND-AUDIO1\n") {   // Audio-Paket: viele Songs in einer Datei
+      const r = await importAudioPack(f); audio += r.saved; unmatched.push(...r.unmatched);
+      continue;
+    }
     const text = await f.text();
     let backup = null;
     try { backup = JSON.parse(text); } catch (err) {}
@@ -439,6 +443,23 @@ function importBackup(b) {
     if (!data.songs[k] || (v.updated || 0) >= (data.songs[k].updated || 0)) data.songs[k] = v;   // neuere Fassung gewinnt
   }
   saveData();
+}
+
+// Audio-Paket (suno/audio.py): Kennung, eine Zeile Inhaltsverzeichnis (JSON), dann die MP3s hintereinander
+async function importAudioPack(f) {
+  const head = await f.slice(0, 65536).arrayBuffer(), bytes = new Uint8Array(head);
+  const nl = bytes.indexOf(10, 17);
+  const index = JSON.parse(new TextDecoder().decode(bytes.slice(17, nl)));
+  let pos = nl + 1, saved = 0;
+  const unmatched = [];
+  for (const t of index.tracks) {
+    const key = songKey({ title: t.title }), blob = f.slice(pos, pos + t.size, "audio/mpeg");
+    pos += t.size;
+    if (!songs.some(x => songKey(x) === key)) { unmatched.push(t.title); continue; }
+    try { await idb.put(key, { blob: new Blob([await blob.arrayBuffer()], { type: "audio/mpeg" }), name: t.name }); saved++; if (pl.key === key) pl.key = null; }
+    catch (err) { unmatched.push(t.title); }
+  }
+  return { saved, unmatched };
 }
 
 // Vorschlagsdatei (z. B. aus Suno): Tempo, Takt, Songmap, Taktraster, Liedtext – nur dort, wo noch nichts eingetragen ist
