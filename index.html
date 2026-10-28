@@ -36,12 +36,12 @@
   body[data-page=text]:not(.listing) .clickbtn { display:flex; }
   .clickbtn.on { color:var(--fg); }
   .clickbtn.on b { color:var(--accent); }
-  /* Lichtstreifen links und rechts am Rand der TEXT-Seite – im Augenwinkel sichtbar beim Lesen */
-  #edge { display:none; }
-  body.clicking[data-page=text]:not(.listing) #edge { display:block; }
-  #edge i { position:fixed; top:0; bottom:0; width:12px; z-index:4; opacity:0; background:var(--fg); pointer-events:none; }
-  #edge i:first-child { left:0; } #edge i:last-child { right:0; }
-  #edge.one i { background:var(--accent); }
+  /* Click-Knöpfe leuchten im Beat auf: die Eins in Akzentfarbe, die anderen Schläge gedämpft */
+  .flbtn { position:relative; overflow:hidden; }
+  .flbtn > span { position:relative; }
+  .flbtn .fl { position:absolute; inset:0; opacity:0; background:var(--fg); pointer-events:none; }
+  .flbtn.one .fl { background:var(--accent); }
+  .flbtn.lit, .flbtn.lit b { color:#000 !important; }
   nav.pages { display:flex; gap:4px; margin:0 -6px; }
   nav.pages button { background:none; border:0; border-bottom:2px solid transparent; border-radius:0; padding:10px 14px 12px;
     font-size:14px; font-weight:600; letter-spacing:.14em; color:var(--dim); }
@@ -124,15 +124,29 @@
   .part .stepper b { min-width:0; font-size:18px; white-space:nowrap; }
   .part .stepper button, .part .mv button { padding:6px 12px; font-size:16px; }
   .part .mv { display:flex; gap:6px; }
+  .cpick { flex:none; width:36px; height:36px; border-radius:50%; border:2px solid var(--line); overflow:hidden; cursor:pointer; }
+  .cpick input { opacity:0; width:100%; height:100%; border:0; padding:0; cursor:pointer; }
+  .part .cstd { padding:6px 10px; font-size:14px; color:var(--dim); }
   /* Abspielen zum Prüfen: Song-Audio + Click über der Songmap */
-  .mplayer { display:flex; flex-wrap:wrap; align-items:center; gap:10px 14px; background:var(--panel); border-radius:14px;
-    padding:10px 12px; margin:0 0 16px; }
-  .mplayer .play { min-width:120px; height:48px; font-size:19px; font-weight:600; }
-  .mplayer .seek { flex-basis:100%; height:30px; margin:0; accent-color:var(--accent); }
+  body:not(.listing)[data-page=map] #pMap { display:flex; flex-direction:column; min-height:100%; padding-bottom:0; }
+  .mapbody { flex:1; padding-bottom:30px; }
+  .mplayer { position:sticky; bottom:0; z-index:3; margin:0 -20px; padding:12px 20px calc(env(safe-area-inset-bottom) + 12px);
+    background:var(--panel); border-top:1px solid var(--line); box-shadow:0 -10px 30px rgba(0,0,0,.55);
+    display:flex; flex-direction:column; gap:10px; }
+  .mplayer .tr { display:flex; align-items:center; gap:10px; }
+  .mplayer .tr > button { height:52px; padding:0 16px; font-size:18px; font-weight:600; white-space:nowrap; }
+  .mplayer .play { min-width:130px; }
+  .mplayer .now { flex:1; min-width:0; display:flex; flex-direction:column; padding-left:6px; }
+  .mplayer .now .pos { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .mplayer .more { min-width:52px; font-size:22px; }
+  .mplayer .extra { display:none; flex-wrap:wrap; align-items:center; gap:10px 14px; padding-top:4px; }
+  .mplayer.open .extra { display:flex; }
+  .mplayer.open .more { background:var(--panel2); border-color:var(--fg); }
+  .mplayer .seek { width:100%; height:30px; margin:0; accent-color:var(--accent); }
   .plmap { touch-action:pan-y; }
   .mplayer .t { font-variant-numeric:tabular-nums; color:var(--dim); }
-  .mplayer .pos { flex:1; min-width:140px; font-size:19px; font-weight:600; }
-  .mplayer button.on { background:var(--accent); border-color:var(--accent); color:#000; font-weight:600; }
+  .mplayer .pos { font-size:19px; font-weight:600; }
+  .mplayer button.on:not(.lit) { background:var(--accent); border-color:var(--accent); color:#000; font-weight:600; }
   .mplayer .hint { flex-basis:100%; margin:0; font-size:14px; }
   .mplayer .shift { display:flex; flex-wrap:wrap; align-items:center; gap:6px; }
   .mplayer .shift b { min-width:5.2em; text-align:center; font-variant-numeric:tabular-nums; font-weight:600; }
@@ -282,7 +296,7 @@
     <div class="midi"><div class="dot" id="dot"></div><span id="midiText">MIDI</span></div>
     <h1 id="title">Songs</h1>
     <span class="meta" id="meta"></span>
-    <button class="clickbtn" id="clickBtn" aria-label="Click an/aus">Click</button>
+    <button class="clickbtn flbtn" id="clickBtn" aria-label="Click an/aus"><i class="fl"></i><span>Click</span></button>
     <div class="size"><button id="smaller" aria-label="Schrift kleiner">A−</button><button id="bigger" aria-label="Schrift größer">A+</button><button id="editText">Bearbeiten</button></div>
     <button id="toggleList">Songs</button>
   </div>
@@ -311,7 +325,6 @@
 <div class="page" id="pClick"></div>
 </div>
 
-<div id="edge"><i></i><i></i></div>
 <div class="sheet" id="editor"><div class="box"></div></div>
 <div class="sheet" id="picker"><div class="box"><h3></h3><div class="ptech"></div><div class="pgrid"></div></div></div>
 <div class="sheet" id="ask"><div class="box"><p id="askText"></p>
@@ -1006,7 +1019,8 @@ function closeEditor() { $("editor").classList.remove("open"); renderChords(); }
 const PARTS = ["Intro", "Strophe", "Pre", "Refrain", "Bridge", "Solo", "Break", "Outro"];
 const PART_COLORS = [[/intro|outro|ende|end/, "#9aa5b1"], [/strophe|verse|vers/, "#4db8ff"], [/pre/, "#ffb02e"],
   [/refrain|chorus|hook/, "#c6ff3d"], [/bridge|c-teil/, "#b48cff"], [/solo/, "#ff6b5e"], [/break|zwischen|inter/, "#2ec4b6"]];
-const partColor = (name) => (PART_COLORS.find(([re]) => re.test(name.toLowerCase())) || [0, "#8a8a92"])[1];
+// eigene Farbe des Teils, sonst Standardfarbe nach dem Namen
+const partColor = (p) => p.color || (PART_COLORS.find(([re]) => re.test((p.name || "").toLowerCase())) || [0, "#8a8a92"])[1];
 // Taktart aus dem Feld „Takt“ (Datei oder eigenes Feld), sonst 4/4. Schläge = worauf sich das Tempo bezieht:
 // x/4 in Vierteln, 6/8 · 9/8 · 12/8 in punktierten Vierteln, andere x/8 in Vierteln (halbe Zahl)
 function timeSig() {
@@ -1025,14 +1039,16 @@ function renderMap() {
   const fromText = sections().filter(x => x.label).length;
   const grid = setting("stage-map-view") === "grid";
   $("pMap").innerHTML = `<div class="tabmode"><div class="seg"><button data-view="list" class="${grid ? "" : "on"}">Liste</button>` +
-    `<button data-view="grid" class="${grid ? "on" : ""}">Raster</button></div></div>` + playerHTML() + (map.length ? `
-    <div class="mapbar plmap">${map.map((p, i) => `<a href="#" data-goto="${i}" style="flex:${p.bars * p.rep};background:${partColor(p.name)}">
+    `<button data-view="grid" class="${grid ? "on" : ""}">Raster</button></div></div>` + (map.length ? `
+    <div class="mapbar plmap">${map.map((p, i) => `<a href="#" data-goto="${i}" style="flex:${p.bars * p.rep};background:${partColor(p)}">
       ${esc(p.name || "–")}<small>${p.bars}${p.rep > 1 ? " × " + p.rep : ""}</small></a>`).join("")}<i class="head" id="plHead" style="display:none"></i></div>
     <p class="maptotal"><b>${bars} Takte</b>${secs ? ` · ≈ ${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, "0")} bei ${bpm} BPM` : ""}</p>` :
     `<p class="empty">Noch keine Songmap. Teile unten antippen – oder aus dem Songtext übernehmen.</p>`) +
-    (grid ? mapGrid(map) : map.map((p, i) => `<div class="part" id="part${i}" data-i="${i}"><div class="clr" style="background:${partColor(p.name)}"></div><div class="body">
+    (grid ? mapGrid(map) : map.map((p, i) => `<div class="part" id="part${i}" data-i="${i}"><div class="clr" style="background:${partColor(p)}"></div><div class="body">
       <div class="top">
         <input class="nm" data-k="name" value="${esc(p.name)}" placeholder="Teil" autocomplete="off">
+        <label class="cpick" style="background:${partColor(p)}" title="Farbe"><input type="color" data-k="color" value="${partColor(p)}"></label>
+        ${p.color ? `<button class="cstd" data-a="nocolor">Standardfarbe</button>` : ""}
         <span class="stepper"><button data-a="bars" data-d="-1">−</button><b>${p.bars} Takte</b><button data-a="bars" data-d="1">+</button></span>
         <span class="stepper"><button data-a="rep" data-d="-1">−</button><b>× ${p.rep}</b><button data-a="rep" data-d="1">+</button></span>
         <span class="mv"><button data-a="up" ${i ? "" : "disabled"}>↑</button><button data-a="down" ${i < map.length - 1 ? "" : "disabled"}>↓</button>
@@ -1044,13 +1060,14 @@ function renderMap() {
     <div class="field" style="margin-top:22px"><span class="cap">Teil anhängen</span><div class="chips">
       ${PARTS.map(n => `<button class="chip" data-add="${n}">+ ${n}</button>`).join("")}
       ${!map.length && fromText ? `<button class="chip" data-a="fromtext">Aus Songtext (${fromText} Teile)</button>` : ""}</div></div>`);
+  $("pMap").innerHTML = `<div class="mapbody">${$("pMap").innerHTML}</div>` + playerHTML();
   plLast = ""; loadTrack(); plDraw();
 }
 // Raster: eine Kachel pro Takt, durchgezählt über den ganzen Song
 function mapGrid(map) {
   let n = 0;
   return `<div class="mapgrid">` + map.map((p, i) => {
-    const col = partColor(p.name);
+    const col = partColor(p);
     let tiles = "";
     for (let r = 0; r < p.rep; r++) {
       if (r) tiles += `<div class="again">Wiederholung ${r + 1}</div>`;
@@ -1090,6 +1107,7 @@ $("pMap").addEventListener("click", (e) => {
   else switch (b.dataset.a) {
     case "fromtext": sections().filter(x => x.label)
       .forEach(x => map.push({ name: x.label, bars: 8, rep: 1, chords: "", note: "" })); break;
+    case "nocolor": delete p.color; break;
     case "bars": p.bars = Math.max(1, Math.min(64, p.bars + +b.dataset.d)); break;
     case "rep": p.rep = Math.max(1, Math.min(16, p.rep + +b.dataset.d)); break;
     case "up": map.splice(i - 1, 0, map.splice(i, 1)[0]); break;
@@ -1108,10 +1126,15 @@ $("pMap").addEventListener("input", (e) => {
   if (!k || !card) return;
   const p = ud().map[+card.dataset.i];
   p[k] = e.target.value; touch();
-  if (k === "name") {   // Farbe und Übersicht gleich mitziehen, ohne das Feld neu zu bauen
-    card.querySelector(".clr").style.background = partColor(p.name);
+  if (k === "name" || k === "color") {   // Farbe und Übersicht gleich mitziehen, ohne das Feld neu zu bauen
+    const col = partColor(p);
+    card.querySelector(".clr").style.background = col; card.querySelector(".cpick").style.background = col;
+    card.querySelector("[data-k=color]").value = col;
     const seg = document.querySelector(`.mapbar [data-goto="${card.dataset.i}"]`);
-    if (seg) { seg.style.background = partColor(p.name); seg.firstChild.textContent = p.name || "–"; }
+    if (seg) { seg.style.background = col; seg.firstChild.textContent = p.name || "–"; }
+    if (k === "color" && !card.querySelector(".cstd")) {
+      card.querySelector(".cpick").insertAdjacentHTML("afterend", `<button class="cstd" data-a="nocolor">Standardfarbe</button>`);
+    }
   }
 });
 
@@ -1171,19 +1194,22 @@ function partAt(bar) {
   return null;
 }
 function playerHTML() {
-  if (!pl.buf) return `<div class="mplayer"><button data-pl="load">♪ Song-Audio laden</button>
-    <span class="t">${pl.loading ? "lädt …" : "MP3 des Songs – dann läuft die Songmap mit, mit Click zum Prüfen."}</span></div>`;
-  return `<div class="mplayer"><button class="play primary" data-pl="play" id="plPlay">${pl.playing ? "❚❚ Pause" : "▶ Play"}</button>
+  if (!pl.buf) return `<div class="mplayer"><div class="tr"><button data-pl="load">♪ Song-Audio laden</button>
+    <span class="t">${pl.loading ? "lädt …" : "MP3 des Songs – dann läuft die Songmap mit, mit Click zum Prüfen."}</span></div></div>`;
+  const open = setting("stage-pl-more") === "1";
+  return `<div class="mplayer${open ? " open" : ""}"><div class="tr">
+    <button class="play primary" data-pl="play" id="plPlay">${pl.playing ? "❚❚ Pause" : "▶ Play"}</button>
     <button data-pl="start">⏮ Anfang</button>
-    <span class="pos" id="plPos"></span><span class="t" id="plTime"></span>
+    <button data-pl="click" id="plClick" class="flbtn ${pl.click ? "on" : ""}"><i class="fl"></i><span>Click</span></button>
+    <div class="now"><span class="pos" id="plPos"></span><span class="t" id="plTime"></span></div>
+    <button class="more" data-pl="more" aria-label="Mehr: Takt, Versatz, Audio">⋯</button></div>
     <input type="range" class="seek" id="plSeek" min="0" max="${pl.buf.duration.toFixed(2)}" step="0.05" value="${pl.offset}" aria-label="Position im Song">
-    <button data-pl="click" class="${pl.click ? "on" : ""}">Click</button>
-    <button data-pl="back">−1 Takt</button><button data-pl="fwd">+1 Takt</button>
+    <div class="extra"><button data-pl="back">−1 Takt</button><button data-pl="fwd">+1 Takt</button>
     <span class="shift"><span class="t">Versatz</span><button data-pl="sh" data-d="-0.1">−0,1</button><button data-pl="sh" data-d="-0.01">−0,01</button>
       <b id="plShift"></b><button data-pl="sh" data-d="0.01">+0,01</button><button data-pl="sh" data-d="0.1">+0,1</button>
       <button data-pl="one" title="Beim Hören genau auf einer Eins antippen">Eins hier</button></span>
     <button class="danger" data-pl="rm">Audio entfernen</button>
-    <p class="hint">${esc(pl.name)}${ud().gridSrc === "konstant" ? " · konstantes Tempo" : ud().grid ? " · Taktraster von Suno" : " · Taktraster aus dem Tempo"} – Teil oder Takt antippen = dorthin springen.</p></div>`;
+    <p class="hint">${esc(pl.name)}${ud().gridSrc === "konstant" ? " · konstantes Tempo" : ud().grid ? " · Taktraster von Suno" : " · Taktraster aus dem Tempo"} – Teil oder Takt antippen = dorthin springen.</p></div></div>`;
 }
 async function loadTrack() {
   if (current === null) return;
@@ -1206,6 +1232,7 @@ function plStop() {
   if (pl.src) { try { pl.src.onended = null; pl.src.stop(); } catch (e) {} pl.src = null; }
   if (pl.playing) pl.offset = plPos();
   pl.playing = false; cancelAnimationFrame(pl.raf); pl.raf = 0;
+  const fb = $("plClick"); if (fb) { fb.firstChild.style.opacity = 0; fb.classList.remove("lit"); }
 }
 function plPlay() {
   const ctx = plCtx(); ctx.resume();
@@ -1230,6 +1257,19 @@ function plBeep(when, accent) {   // kurzer Click auf derselben Uhr wie die Musi
 }
 function plLoop() {
   cancelAnimationFrame(pl.raf);
+  const fb = $("plClick");
+  if (fb) {   // Click-Knopf leuchtet im Beat der Musik
+    let flash = 0, one = false;
+    if (pl.playing && pl.click) {
+      const bar = barAtTime(plPos());
+      if (bar >= 0) {
+        const bp = (bar - Math.floor(bar)) * beatsPerBar();
+        one = Math.floor(bp) === 0;
+        flash = Math.max(0, 1 - (bp % 1) * 2.2) * clickBright() * (one ? 1 : OFFBEAT);
+      }
+    }
+    fb.firstChild.style.opacity = flash; fb.classList.toggle("one", one); fb.classList.toggle("lit", flash > 0.5);
+  }
   if (!pl.playing) return;
   if (pl.click) {   // Schläge der nächsten 0,25 s vorausplanen
     const now = plPos(), m = beatsPerBar(), k0 = Math.floor(barAtTime(now));
@@ -1273,6 +1313,7 @@ function plDraw() {   // Zeit, Takt/Teil, Kopf auf der Leiste, aktuelle Karte bz
 }
 function plAction(a, b) {
   if (a === "load") return $("plFile").click();
+  if (a === "more") { const m = b.closest(".mplayer"); m.classList.toggle("open"); setting("stage-pl-more", m.classList.contains("open") ? "1" : "0"); return; }
   if (!pl.buf) return;
   if (a === "play") { if (pl.playing) plStop(); else plPlay(); plLast = ""; plDraw(); return; }
   if (a === "start") { plSeek(0); plLast = ""; plDraw(); return; }
@@ -1534,7 +1575,7 @@ function drawClick() {   // pro Bild: kleine Anzeige im Kopf und (falls offen) d
     clk.shape = shape;
     btn.classList.toggle("on", clk.on);
     document.body.classList.toggle("clicking", clk.on && !!st.bpm);
-    btn.innerHTML = clk.on && st.bpm ? `<b>Click</b> ${Math.round(st.bpm)}` : "Click";
+    btn.innerHTML = `<i class="fl"></i><span>${clk.on && st.bpm ? `<b>Click</b> ${Math.round(st.bpm)}` : "Click"}</span>`;
     clk.last = "";
     if ($("ckBpm")) { $("ckBpm").textContent = st.bpm ? Math.round(st.bpm) : "–"; $("ckSrc").textContent = clickSource(); }
   }
@@ -1542,7 +1583,7 @@ function drawClick() {   // pro Bild: kleine Anzeige im Kopf und (falls offen) d
   const key = st.bar + "." + st.beat;
   if (key !== clk.last) {   // neuer Schlag
     clk.last = key;
-    $("edge").classList.toggle("one", st.beat === 0);
+    btn.classList.toggle("one", st.beat === 0);
     document.querySelectorAll(".ckbeats div").forEach((d, i) => d.classList.toggle("hit", i === st.beat));
     const fl = document.querySelector(".ckflash");
     if (fl) { fl.classList.toggle("one", st.beat === 0); fl.querySelector("b").textContent = st.beat + 1; }
@@ -1550,7 +1591,7 @@ function drawClick() {   // pro Bild: kleine Anzeige im Kopf und (falls offen) d
   }
   const fade = 1 - 0.75 * Math.min(1, st.phase * 1.6);   // aufleuchten und abklingen
   const flash = Math.max(0, 1 - st.phase * 2.2) * clickBright() * (st.beat === 0 ? 1 : OFFBEAT);   // kurz voll, dann dunkel
-  if (page === "text") $("edge").querySelectorAll("i").forEach(i => { i.style.opacity = flash; });
+  btn.firstChild.style.opacity = flash; btn.classList.toggle("lit", flash > 0.5);
   if (page === "click") {
     const box = document.querySelector(".ckbeats div.hit"); if (box) box.style.opacity = 0.35 + 0.65 * fade;
     const fl = document.querySelector(".ckflash i");
@@ -1605,7 +1646,7 @@ function renderClick() {
       <div><span class="cap">Taktart</span><span class="v">${st.sig.num}/${st.sig.den}</span></div>
       <div><span class="cap">Quelle</span><span class="v" id="ckSrc">${clickSource()}</span></div>
     </div>
-    ${map.length ? `<div class="mapbar ckmap">${map.map((p, i) => `<a href="#" data-goto="${i}" style="flex:${p.bars * p.rep};background:${partColor(p.name)}">
+    ${map.length ? `<div class="mapbar ckmap">${map.map((p, i) => `<a href="#" data-goto="${i}" style="flex:${p.bars * p.rep};background:${partColor(p)}">
       ${esc(p.name || "–")}<small>${p.bars}${p.rep > 1 ? " × " + p.rep : ""}</small></a>`).join("")}<i class="head"></i></div>
       <div class="cknow"><b id="ckPart"></b><span id="ckPartPos"></span><span class="nx" id="ckNext"></span></div>` : ""}
     ${ctl}
