@@ -132,6 +132,8 @@
   .mplayer .pos { flex:1; min-width:140px; font-size:19px; font-weight:600; }
   .mplayer button.on { background:var(--accent); border-color:var(--accent); color:#000; font-weight:600; }
   .mplayer .hint { flex-basis:100%; margin:0; font-size:14px; }
+  .mplayer .shift { display:flex; flex-wrap:wrap; align-items:center; gap:6px; }
+  .mplayer .shift b { min-width:5.2em; text-align:center; font-variant-numeric:tabular-nums; font-weight:600; }
   .plmap { position:relative; }
   .plmap .head { position:absolute; top:-5px; bottom:-5px; width:3px; margin-left:-1px; background:#fff; border-radius:2px;
     box-shadow:0 0 0 2px #000; pointer-events:none; }
@@ -1128,8 +1130,11 @@ const pl = { key: null, buf: null, name: "", ctx: null, src: null, playing: fals
 const plCtx = () => pl.ctx || (pl.ctx = new (window.AudioContext || window.webkitAudioContext)());
 const plPos = () => pl.playing ? pl.ctx.currentTime - pl.startedAt : pl.offset;
 const fmt = (t) => Math.floor(t / 60) + ":" + String(Math.floor(t % 60)).padStart(2, "0");
-// Takt-Anfänge: Sunos Raster (ud().grid) oder gleichmäßig aus Tempo und Taktart
-function barStart(k) {
+// Takt-Anfänge: Sunos Raster (ud().grid) oder gleichmäßig aus Tempo und Taktart,
+// verschoben um den Versatz des Songs (ud().audioShift, s) – falls das Audio nicht genau auf der Eins beginnt
+const audioShift = () => ud().audioShift || 0;
+const barStart = (k) => rawBarStart(k) + audioShift();
+function rawBarStart(k) {
   const g = ud().grid;
   if (g && g.length > 1) {
     if (k < g.length) return g[Math.max(0, k)];
@@ -1163,6 +1168,9 @@ function playerHTML() {
     <span class="pos" id="plPos"></span><span class="t" id="plTime"></span>
     <button data-pl="click" class="${pl.click ? "on" : ""}">Click</button>
     <button data-pl="back">−1 Takt</button><button data-pl="fwd">+1 Takt</button>
+    <span class="shift"><span class="t">Versatz</span><button data-pl="sh" data-d="-0.1">−0,1</button><button data-pl="sh" data-d="-0.01">−0,01</button>
+      <b id="plShift"></b><button data-pl="sh" data-d="0.01">+0,01</button><button data-pl="sh" data-d="0.1">+0,1</button>
+      <button data-pl="one" title="Beim Hören genau auf einer Eins antippen">Eins hier</button></span>
     <button class="danger" data-pl="rm">Audio entfernen</button>
     <p class="hint">${esc(pl.name)}${ud().grid ? " · Taktraster von Suno" : " · Taktraster aus dem Tempo"} – Teil oder Takt antippen = dorthin springen.</p></div>`;
 }
@@ -1231,6 +1239,7 @@ function plDraw() {   // Zeit, Takt/Teil, Kopf auf der Leiste, aktuelle Karte bz
   const t = plPos(), bar = barAtTime(t), whole = Math.floor(bar), here = whole >= 0 ? partAt(whole) : null;
   const total = (ud().map || []).reduce((n, p) => n + p.bars * p.rep, 0);
   if ($("plTime")) $("plTime").textContent = fmt(t) + " / " + fmt(pl.buf.duration);
+  if ($("plShift")) { const v = audioShift(); $("plShift").textContent = (v >= 0 ? "+" : "−") + Math.abs(v).toFixed(2).replace(".", ",") + " s"; }
   const head = $("plHead");
   if (head && total) {   // im richtigen Block positionieren – die Blöcke sind wegen Abständen nicht ganz proportional
     const segs = document.querySelectorAll(".plmap [data-goto]");
@@ -1254,6 +1263,13 @@ function plAction(a, b) {
   if (!pl.buf) return;
   if (a === "play") { if (pl.playing) plStop(); else plPlay(); b.textContent = pl.playing ? "❚❚" : "▶"; plLast = ""; plDraw(); return; }
   if (a === "click") { pl.click = !pl.click; setting("stage-map-click", pl.click ? "1" : "0"); b.classList.toggle("on", pl.click); pl.sched = plPos(); return; }
+  if (a === "sh" || a === "one") {   // Raster gegen das Audio verschieben
+    const u = ud(), t = plPos();
+    if (a === "sh") u.audioShift = Math.round(((u.audioShift || 0) + +b.dataset.d) * 1000) / 1000;
+    else u.audioShift = Math.round(((u.audioShift || 0) + t - barStart(Math.round(barAtTime(t)))) * 1000) / 1000;
+    if (!u.audioShift) delete u.audioShift;
+    touch(); pl.sched = t; plLast = ""; plDraw(); return;
+  }
   if (a === "back" || a === "fwd") { const k = Math.floor(barAtTime(plPos()) + 0.02) + (a === "fwd" ? 1 : -1); plSeek(barStart(Math.max(0, k))); return; }
   if (a === "rm") {
     if (!b.classList.contains("armed")) { b.classList.add("armed"); b.textContent = "Wirklich entfernen?"; return; }
