@@ -136,6 +136,7 @@
   .mplayer .tr { display:flex; align-items:center; gap:10px; }
   .mplayer .tr > button { height:52px; padding:0 16px; font-size:18px; font-weight:600; white-space:nowrap; }
   .mplayer .play { min-width:130px; }
+  .mplayer .ico { min-width:64px; display:flex; align-items:center; justify-content:center; }
   .mplayer .now { flex:1; min-width:0; display:flex; flex-direction:column; padding-left:6px; }
   .mplayer .now .pos { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   .mplayer .more { min-width:52px; font-size:22px; }
@@ -1199,7 +1200,7 @@ function playerHTML() {
   const open = setting("stage-pl-more") === "1";
   return `<div class="mplayer${open ? " open" : ""}"><div class="tr">
     <button class="play primary" data-pl="play" id="plPlay">${pl.playing ? "❚❚ Pause" : "▶ Play"}</button>
-    <button data-pl="start">⏮ Anfang</button>
+    <button class="ico" data-pl="start" aria-label="Zum Anfang"><svg viewBox="0 0 24 16" width="30" height="20" fill="currentColor"><path d="M12 0 0 8l12 8zM24 0 12 8l12 8z"/></svg></button>
     <button data-pl="click" id="plClick" class="flbtn ${pl.click ? "on" : ""}"><i class="fl"></i><span>Click</span></button>
     <div class="now"><span class="pos" id="plPos"></span><span class="t" id="plTime"></span></div>
     <button class="more" data-pl="more" aria-label="Mehr: Takt, Versatz, Audio">⋯</button></div>
