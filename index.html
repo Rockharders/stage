@@ -348,7 +348,7 @@
 <script>
 const $ = (id) => document.getElementById(id);
 const STORE = "stage-songs-v1", DATA = "stage-data-v1";
-const CH = 16, SCENE_CC = 20, VIEW_CC = 21;   // VIEW_CC: 0 TEXT, 1 TEXT <-> CLICK, 2 SONGMAP (Kacheln)
+const CH = 16, SCENE_CC = 20, VIEW_CC = 21;   // VIEW_CC: 0 TEXT, 1 TEXT <-> CLICK, 2 SONGMAP (Kacheln), 3 Click an/aus
 let songs = [];      // aus den Dateien: {nr, title, tempo, key, scenes[], info[[k, v]], sections[{label, lines[]}]}
 let data = { v: 1, songs: {} };   // am iPad gebaut: Griffe, Tabs, Notizen pro Song
 let current = null;  // Index in songs
@@ -1740,8 +1740,9 @@ function onMidi(ev) {
   else if ((st & 0xf0) === 0xb0 && d1 === SCENE_CC) scene(d2);
   else if ((st & 0xf0) === 0xb0 && d1 === VIEW_CC) view(d2);
 }
-function view(v) {   // Ansicht per MC8-Taster (Song-Bank D: kurz Text/Click, lang Songmap)
+function view(v) {   // per MC8-Taster (Song-Bank D: kurz Text/Click, lang Songmap, Doppeltipp Click an/aus)
   if (current === null) return;
+  if (v === 3) { setClick(!clk.on); return; }   // Doppeltipp: Click an/aus, Ansicht bleibt
   document.body.classList.remove("listing");
   if (v === 2) { setting("stage-map-view", "grid"); setPage("map"); }
   else setPage(v === 1 && page !== "click" ? "click" : "text");
