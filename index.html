@@ -1158,7 +1158,7 @@ const idb = (() => {
   return { get: (k) => run("readonly", st => st.get(k)), put: (k, v) => run("readwrite", st => st.put(v, k)),
            del: (k) => run("readwrite", st => st.delete(k)) };
 })();
-const pl = { key: null, buf: null, name: "", ctx: null, src: null, playing: false, startedAt: 0, offset: 0,
+const pl = { key: null, buf: null, name: "", ctx: null, stuck: false, src: null, playing: false, startedAt: 0, offset: 0,
              click: setting("stage-map-click") !== "0", sched: -1, raf: 0, loading: false };
 const plCtx = () => pl.ctx || (pl.ctx = new (window.AudioContext || window.webkitAudioContext)());
 const plPos = () => pl.playing ? pl.ctx.currentTime - pl.startedAt : pl.offset;
@@ -1236,14 +1236,30 @@ function plStop() {
   const fb = $("plClick"); if (fb) { fb.firstChild.style.opacity = 0; fb.classList.remove("lit"); }
 }
 function plPlay() {
-  const ctx = plCtx(); ctx.resume();
+  // iPad: nach einer Unterbrechung (anderes Audio, Bildschirm aus, Hintergrund) bleibt der Audio-Kontext manchmal
+  // stehen und spielt nichts mehr – dann einen neuen anlegen (die geladene MP3 lässt sich weiterverwenden)
+  let ctx = plCtx();
+  if (pl.stuck || ctx.state === "interrupted" || ctx.state === "closed") {
+    try { ctx.close(); } catch (e) {}
+    pl.ctx = null; pl.stuck = false; ctx = plCtx();
+  }
+  ctx.resume();
   if (pl.offset >= pl.buf.duration - 0.05) pl.offset = 0;
   const src = ctx.createBufferSource(); src.buffer = pl.buf; src.connect(ctx.destination);
   pl.startedAt = ctx.currentTime - pl.offset; src.start(0, pl.offset);
   src.onended = () => { if (pl.src === src) { pl.src = null; pl.playing = false; pl.offset = 0; renderMap(); } };
   pl.src = src; pl.playing = true; pl.sched = pl.offset - 0.001;
   plLoop();
+  const t0 = ctx.currentTime, from = pl.offset;
+  setTimeout(() => {   // läuft die Uhr nicht, hängt der Kontext: anhalten und beim nächsten Play neu anlegen
+    if (pl.src !== src || !pl.playing || ctx.currentTime > t0) return;
+    pl.stuck = true; plStop(); pl.offset = from; plLast = ""; plDraw();
+    toast("Audio war blockiert – bitte nochmal auf Play tippen.", 5000);
+  }, 700);
 }
+document.addEventListener("visibilitychange", () => {   // zurück aus dem Hintergrund: Kontext beim nächsten Play prüfen
+  if (!document.hidden && pl.ctx && pl.ctx.state !== "running" && !pl.playing) pl.stuck = true;
+});
 function plSeek(t) {
   const was = pl.playing;
   plStop(); pl.offset = Math.max(0, Math.min(t, (pl.buf ? pl.buf.duration : 0) - 0.05));
