@@ -210,6 +210,16 @@
   .grow { flex:1; }
   @media (max-width:720px) { #editor .box { grid-template-columns:1fr; } }
   #picker { z-index:20; }
+  /* eigene Rückfrage und Meldung – confirm()/alert() zeigen manche In-App-Browser nicht an */
+  #ask { z-index:25; }
+  #ask .box { max-width:540px; }
+  #ask p { margin:0 0 20px; font-size:19px; line-height:1.45; }
+  #ask .btns { justify-content:flex-end; }
+  #ask .btns button { font-size:18px; padding:12px 20px; }
+  #toast { position:fixed; left:50%; bottom:calc(env(safe-area-inset-bottom) + 20px); transform:translateX(-50%); z-index:30;
+    max-width:min(92vw, 640px); background:var(--panel2); border:1px solid var(--line); border-radius:14px; padding:14px 18px;
+    font-size:17px; line-height:1.4; box-shadow:0 10px 40px rgba(0,0,0,.5); display:none; }
+  #toast.show { display:block; }
   #picker .box { max-width:520px; }
   #picker h3 { margin:0 0 14px; font-size:15px; font-weight:600; letter-spacing:.12em; text-transform:uppercase; color:var(--dim); }
   .pgrid { display:grid; grid-template-columns:repeat(6, 1fr); gap:8px; }
@@ -300,6 +310,9 @@
 <div id="edge"><i></i><i></i></div>
 <div class="sheet" id="editor"><div class="box"></div></div>
 <div class="sheet" id="picker"><div class="box"><h3></h3><div class="ptech"></div><div class="pgrid"></div></div></div>
+<div class="sheet" id="ask"><div class="box"><p id="askText"></p>
+  <div class="btns"><button id="askNo">Abbrechen</button><button class="primary" id="askYes">OK</button></div></div></div>
+<div id="toast" role="status"></div>
 <div class="sheet" id="lyrics"><div class="box">
   <div class="tabhead" style="padding:0 0 12px"><b class="grow">Text bearbeiten</b>
     <button class="danger" id="lyOrig">Original wiederherstellen</button><button id="lyCancel">Abbrechen</button>
@@ -397,9 +410,11 @@ $("file").onchange = async (e) => {
   const files = [...e.target.files];
   if (!files.length) return;
   const loaded = [];
-  let restored = 0, suggested = null, audio = 0, replaced = 0;
+  let restored = 0, suggested = null, audio = 0, replaced = 0, declined = false;
   const unmatched = [], isAudio = (f) => /^audio\//.test(f.type) || /\.(mp3|m4a|wav|aac)$/i.test(f.name);
   files.sort((a, b) => isAudio(a) - isAudio(b));   // Audio zuletzt – Vorschläge legen evtl. erst die Songs an
+  toast("Lädt …", 120000);
+  try {
   for (const f of files) {
     if (isAudio(f)) {   // Song-Audio: per Dateiname dem Song zuordnen
       const key = songKey({ title: f.name.replace(/\.[^.]+$/, "") });
@@ -417,26 +432,47 @@ $("file").onchange = async (e) => {
     try { backup = JSON.parse(text); } catch (err) {}
     // „buehne“ = Sicherungen vor der Umbenennung in Stagehand
     if (backup && backup.app === "stagehand" && backup.kind === "komplett") {   // ersetzt alles – nur nach Rückfrage
-      if (confirm(`Alle Songs und alles Eingetragene (Griffe, Tabs, Notizen, Songmaps …) durch diesen Stand ersetzen? (${backup.songs.length} Songs)`)) {
+      if (await ask(`Alle Songs und alles Eingetragene (Griffe, Tabs, Notizen, Songmaps, Favoriten) durch diesen Stand ersetzen? ` +
+                    `${backup.songs.length} Songs. Geladene Song-Audios bleiben.`, "Alles ersetzen")) {
         songs = backup.songs.map(x => parse(x.name, x.text));
         songs.sort((a, b) => a.nr - b.nr || a.title.localeCompare(b.title));
         data = backup.data; save(); saveData(); current = null; replaced = songs.length;
-      }
+      } else declined = true;
     }
     else if (backup && backup.app === "stagehand" && backup.kind === "vorschlag") { suggested = importSuggestion(backup); }
     else if (backup && (backup.app === "stagehand" || backup.app === "buehne")) { importBackup(backup); restored++; }
     else loaded.push(parse(f.name, text));
   }
+  } catch (err) { toast("Fehler beim Laden: " + (err && err.message || err), 10000); e.target.value = ""; return; }
   if (loaded.length) mergeSongs(loaded);
   renderList();
-  $("hint").textContent = [loaded.length ? loaded.length + " Song(s) geladen." : "",
+  const msg = [loaded.length ? loaded.length + " Song(s) geladen." : "",
                            restored ? "Sicherung geladen." : "",
                            replaced ? `Komplett ersetzt: ${replaced} Songs.` : "",
                            suggested ? `Vorschläge: ${suggested.filled} Song(s) ergänzt, ${suggested.added} neu angelegt – Vorhandenes bleibt.` : "",
                            audio ? `${audio} Song-Audio(s) gespeichert.` : "",
-                           unmatched.length ? `Ohne passenden Song: ${unmatched.join(", ")}` : ""].filter(Boolean).join(" ");
+                           unmatched.length ? `Ohne passenden Song: ${unmatched.join(", ")}` : "",
+                           declined ? "Ersetzen abgebrochen – nichts geändert." : ""].filter(Boolean).join(" ");
+  $("hint").textContent = msg;
+  toast(msg || "Nichts geladen – Datei nicht erkannt.", 7000);
   e.target.value = "";
 };
+// Rückfrage im eigenen Fenster (Promise: true = bestätigt) und Meldungsleiste unten
+function ask(text, yes) {
+  return new Promise((res) => {
+    $("toast").classList.remove("show");
+    $("askText").textContent = text; $("askYes").textContent = yes || "OK";
+    const done = (v) => { $("ask").classList.remove("open"); res(v); };
+    $("askYes").onclick = () => done(true); $("askNo").onclick = () => done(false);
+    $("ask").classList.add("open");
+  });
+}
+let toastTimer = 0;
+function toast(msg, ms) {
+  const t = $("toast"); t.textContent = msg; t.classList.add("show");
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove("show"), ms || 6000);
+}
+$("toast").onclick = () => $("toast").classList.remove("show");
 function importBackup(b) {
   if (Array.isArray(b.songs)) mergeSongs(b.songs);
   for (const [k, v] of Object.entries((b.data && b.data.songs) || {})) {
@@ -1232,7 +1268,7 @@ $("plFile").onchange = async (e) => {
     await plDecode(f, f.name);
     pl.offset = 0;
     idb.put(pl.key, { blob: f, name: f.name }).catch(() => {});   // bleibt auf dem Gerät für das nächste Mal
-  } catch (err) { alert("Diese Datei kann ich nicht abspielen: " + f.name); }
+  } catch (err) { toast("Diese Datei kann ich nicht abspielen: " + f.name, 8000); }
   pl.loading = false; renderMap();
 };
 
