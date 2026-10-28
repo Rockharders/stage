@@ -127,7 +127,9 @@
   /* Abspielen zum Prüfen: Song-Audio + Click über der Songmap */
   .mplayer { display:flex; flex-wrap:wrap; align-items:center; gap:10px 14px; background:var(--panel); border-radius:14px;
     padding:10px 12px; margin:0 0 16px; }
-  .mplayer .play { width:56px; height:48px; padding:0; font-size:22px; }
+  .mplayer .play { min-width:120px; height:48px; font-size:19px; font-weight:600; }
+  .mplayer .seek { flex-basis:100%; height:30px; margin:0; accent-color:var(--accent); }
+  .plmap { touch-action:pan-y; }
   .mplayer .t { font-variant-numeric:tabular-nums; color:var(--dim); }
   .mplayer .pos { flex:1; min-width:140px; font-size:19px; font-weight:600; }
   .mplayer button.on { background:var(--accent); border-color:var(--accent); color:#000; font-weight:600; }
@@ -1064,6 +1066,7 @@ $("pMap").addEventListener("click", (e) => {
   const go = e.target.closest("[data-goto]");
   if (go) {   // mit Audio: dorthin springen, sonst zum Teil scrollen
     e.preventDefault();
+    if (Date.now() - mapDragEnd < 400) return;
     if (pl.buf) { plSeek(barStart(partStartBar(+go.dataset.goto))); return; }
     ($("part" + go.dataset.goto) || $("glab" + go.dataset.goto)).scrollIntoView({ behavior: "smooth", block: "center" }); return;
   }
@@ -1164,8 +1167,10 @@ function partAt(bar) {
 function playerHTML() {
   if (!pl.buf) return `<div class="mplayer"><button data-pl="load">♪ Song-Audio laden</button>
     <span class="t">${pl.loading ? "lädt …" : "MP3 des Songs – dann läuft die Songmap mit, mit Click zum Prüfen."}</span></div>`;
-  return `<div class="mplayer"><button class="play primary" data-pl="play" id="plPlay">${pl.playing ? "❚❚" : "▶"}</button>
+  return `<div class="mplayer"><button class="play primary" data-pl="play" id="plPlay">${pl.playing ? "❚❚ Pause" : "▶ Play"}</button>
+    <button data-pl="start">⏮ Anfang</button>
     <span class="pos" id="plPos"></span><span class="t" id="plTime"></span>
+    <input type="range" class="seek" id="plSeek" min="0" max="${pl.buf.duration.toFixed(2)}" step="0.05" value="${pl.offset}" aria-label="Position im Song">
     <button data-pl="click" class="${pl.click ? "on" : ""}">Click</button>
     <button data-pl="back">−1 Takt</button><button data-pl="fwd">+1 Takt</button>
     <span class="shift"><span class="t">Versatz</span><button data-pl="sh" data-d="-0.1">−0,1</button><button data-pl="sh" data-d="-0.01">−0,01</button>
@@ -1239,6 +1244,8 @@ function plDraw() {   // Zeit, Takt/Teil, Kopf auf der Leiste, aktuelle Karte bz
   const t = plPos(), bar = barAtTime(t), whole = Math.floor(bar), here = whole >= 0 ? partAt(whole) : null;
   const total = (ud().map || []).reduce((n, p) => n + p.bars * p.rep, 0);
   if ($("plTime")) $("plTime").textContent = fmt(t) + " / " + fmt(pl.buf.duration);
+  const btn = $("plPlay"); if (btn) btn.textContent = pl.playing ? "❚❚ Pause" : "▶ Play";
+  const seek = $("plSeek"); if (seek && document.activeElement !== seek) seek.value = t;
   if ($("plShift")) { const v = audioShift(); $("plShift").textContent = (v >= 0 ? "+" : "−") + Math.abs(v).toFixed(2).replace(".", ",") + " s"; }
   const head = $("plHead");
   if (head && total) {   // im richtigen Block positionieren – die Blöcke sind wegen Abständen nicht ganz proportional
@@ -1261,7 +1268,8 @@ function plDraw() {   // Zeit, Takt/Teil, Kopf auf der Leiste, aktuelle Karte bz
 function plAction(a, b) {
   if (a === "load") return $("plFile").click();
   if (!pl.buf) return;
-  if (a === "play") { if (pl.playing) plStop(); else plPlay(); b.textContent = pl.playing ? "❚❚" : "▶"; plLast = ""; plDraw(); return; }
+  if (a === "play") { if (pl.playing) plStop(); else plPlay(); plLast = ""; plDraw(); return; }
+  if (a === "start") { plSeek(0); plLast = ""; plDraw(); return; }
   if (a === "click") { pl.click = !pl.click; setting("stage-map-click", pl.click ? "1" : "0"); b.classList.toggle("on", pl.click); pl.sched = plPos(); return; }
   if (a === "sh" || a === "one") {   // Raster gegen das Audio verschieben
     const u = ud(), t = plPos();
@@ -1276,6 +1284,45 @@ function plAction(a, b) {
     plStop(); pl.buf = null; idb.del(pl.key).catch(() => {}); renderMap();
   }
 }
+// Spulen: Schieberegler oder Finger auf der farbigen Leiste ziehen – beim Loslassen geht es dort weiter
+function plScrubTo(t) {
+  if (!pl.scrub) { pl.scrub = { was: pl.playing }; plStop(); }
+  pl.offset = Math.max(0, Math.min(t, pl.buf.duration - 0.05)); plDraw();
+}
+function plScrubEnd() { if (!pl.scrub) return; const was = pl.scrub.was; pl.scrub = null; if (was) plPlay(); else plDraw(); }
+$("pMap").addEventListener("input", (e) => { if (e.target.id === "plSeek" && pl.buf) plScrubTo(+e.target.value); });
+$("pMap").addEventListener("change", (e) => { if (e.target.id === "plSeek") plScrubEnd(); });
+function timeAtX(bar, x) {   // x in der farbigen Leiste → Zeit im Song
+  const segs = [...bar.querySelectorAll("[data-goto]")], map = ud().map || [];
+  for (let i = 0; i < segs.length; i++) {
+    const sg = segs[i];
+    if (x <= sg.offsetLeft + sg.offsetWidth || i === segs.length - 1) {
+      const f = Math.max(0, Math.min(1, (x - sg.offsetLeft) / sg.offsetWidth)), b = partStartBar(i) + f * map[i].bars * map[i].rep;
+      const k = Math.floor(b);
+      return barStart(k) + (b - k) * (barStart(k + 1) - barStart(k));
+    }
+  }
+  return 0;
+}
+let mapDrag = null, mapDragEnd = 0;   // nach dem Ziehen kein Sprung durch den Klick, der danach kommt
+$("pMap").addEventListener("pointerdown", (e) => {
+  const bar = e.target.closest(".plmap");
+  if (!bar || !pl.buf) return;
+  mapDrag = { bar, x0: e.clientX, moved: false, id: e.pointerId };
+});
+window.addEventListener("pointermove", (e) => {
+  if (!mapDrag) return;
+  if (!mapDrag.moved && Math.abs(e.clientX - mapDrag.x0) < 6) return;
+  if (!mapDrag.moved) try { mapDrag.bar.setPointerCapture(mapDrag.id); } catch (err) {}   // erst beim Ziehen festhalten – ein Tipp bleibt ein Tipp
+  mapDrag.moved = true;
+  plScrubTo(timeAtX(mapDrag.bar, e.clientX - mapDrag.bar.getBoundingClientRect().left));
+});
+function mapDragStop() {
+  if (!mapDrag) return;
+  if (mapDrag.moved) { mapDragEnd = Date.now(); plScrubEnd(); }
+  mapDrag = null;
+}
+["pointerup", "pointercancel", "lostpointercapture", "mouseup", "touchend"].forEach(ev => window.addEventListener(ev, mapDragStop, true));
 $("plFile").onchange = async (e) => {
   const f = e.target.files[0]; e.target.value = "";
   if (!f || current === null) return;
