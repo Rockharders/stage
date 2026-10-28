@@ -647,7 +647,7 @@ function renderList() {
     ? `<div class="grp">Favoriten</div>${favs.map(row).join("")}<div class="grp">Weitere Songs</div>${rest.map(row).join("")}`
     : songs.map(row).join("");
   if (!songs.length) $("hint").textContent =
-    "Noch keine Songs. Tippe auf „Laden …“ und wähle die Textdateien aus Google Drive (xx_Hagen_Tools/Stage App/Songtexte).";
+    "Noch keine Songs. Tippe auf „Laden …“ und wähle einen Stand (stagehand-komplett.json) oder Songtexte (.chopro/.txt).";
 }
 function setPage(p) {
   page = p;
