@@ -58,8 +58,13 @@
   body.listing #list { display:block; }
   #list a { display:flex; gap:16px; padding:14px 0; border-bottom:1px solid var(--line); color:var(--fg);
     text-decoration:none; font-size:24px; }
-  #list a span { color:var(--dim); min-width:2em; }
+  #list a > span:first-child { color:var(--dim); min-width:2em; }
   #list a.active { color:var(--accent); }
+  #list a .t { flex:1; min-width:0; }
+  #list a .fav { flex:none; margin:-14px 0; padding:0 4px 0 16px; display:flex; align-items:center; font-size:26px; color:#3a3a40; }
+  #list a .fav.on { color:#ffc93d; }
+  #list .grp { margin:22px 0 2px; font-size:13px; letter-spacing:.14em; text-transform:uppercase; color:var(--dim); }
+  #list .grp:first-child { margin-top:0; }
   .tools { display:flex; flex-wrap:wrap; gap:10px; margin:0 0 18px; }
   .hint { color:var(--dim); line-height:1.5; }
   input[type=file] { display:none; }
@@ -610,9 +615,16 @@ $("picker").onclick = (e) => {
 
 // ---------- Anzeige ----------
 function esc(t) { return String(t).replace(/[&<>"]/g, c => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;" }[c])); }
+// Favoriten (Stern) stehen oben, die übrigen darunter – jeweils nach Nummer; gespeichert pro Song, kommt mit in die Sicherung
+const isFav = (s) => !!(data.songs[songKey(s)] || {}).fav;
 function renderList() {
-  $("songs").innerHTML = songs.map((s, i) =>
-    `<a href="#" data-i="${i}" class="${i === current ? "active" : ""}"><span>${s.nr || ""}</span>${esc(s.title)}</a>`).join("");
+  const row = (s) => { const i = songs.indexOf(s), f = isFav(s);
+    return `<a href="#" data-i="${i}" class="${i === current ? "active" : ""}"><span>${s.nr || ""}</span><span class="t">${esc(s.title)}</span>` +
+      `<span class="fav ${f ? "on" : ""}" data-fav="${i}" role="button" aria-label="${f ? "Favorit entfernen" : "Als Favorit markieren"}">${f ? "★" : "☆"}</span></a>`; };
+  const favs = songs.filter(isFav), rest = songs.filter(s => !isFav(s));
+  $("songs").innerHTML = favs.length
+    ? `<div class="grp">Favoriten</div>${favs.map(row).join("")}<div class="grp">Weitere Songs</div>${rest.map(row).join("")}`
+    : songs.map(row).join("");
   if (!songs.length) $("hint").textContent =
     "Noch keine Songs. Tippe auf „Laden …“ und wähle die Textdateien aus Google Drive (xx_Hagen_Tools/Stage App/Songtexte).";
 }
@@ -1313,7 +1325,17 @@ function tabText(tb) {
   }).join("") + "|").join("\n");
 }
 
-$("songs").onclick = (e) => { const a = e.target.closest("a"); if (!a) return; e.preventDefault(); openSong(+a.dataset.i); };
+$("songs").onclick = (e) => {
+  const a = e.target.closest("a"); if (!a) return;
+  e.preventDefault();
+  const f = e.target.closest("[data-fav]");
+  if (f) {   // Stern: Favorit an/aus, Song nicht öffnen
+    const k = songKey(songs[+f.dataset.fav]);
+    const d = data.songs[k] || (data.songs[k] = { updated: 0, guitar: "", tuning: "std", capo: 0, notes: "", chords: [], tabs: [] });
+    d.fav = !d.fav; d.updated = Date.now(); saveData(); renderList(); return;
+  }
+  openSong(+a.dataset.i);
+};
 $("pText").onclick = (e) => { const el = e.target.closest("section"); if (el) { section = +el.dataset.i; highlight(); } };
 $("toggleList").onclick = () => {
   if (current === null) return;
