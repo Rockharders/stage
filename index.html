@@ -487,7 +487,7 @@ function importBackup(b) {
 
 // Audio-Paket (suno/audio.py): Kennung, eine Zeile Inhaltsverzeichnis (JSON), dann die MP3s hintereinander
 async function importAudioPack(f) {
-  const head = await f.slice(0, 65536).arrayBuffer(), bytes = new Uint8Array(head);
+  const head = await f.slice(0, 1 << 20).arrayBuffer(), bytes = new Uint8Array(head);
   const nl = bytes.indexOf(10, 17);
   const index = JSON.parse(new TextDecoder().decode(bytes.slice(17, nl)));
   let pos = nl + 1, saved = 0;
@@ -497,8 +497,13 @@ async function importAudioPack(f) {
     pos += t.size;
     if (!songs.some(x => songKey(x) === key)) { unmatched.push(t.title); continue; }
     try { await idb.put(key, { blob: new Blob([await blob.arrayBuffer()], { type: "audio/mpeg" }), name: t.name }); saved++; if (pl.key === key) pl.key = null; }
-    catch (err) { unmatched.push(t.title); }
+    catch (err) { unmatched.push(t.title); continue; }
+    if (t.grid) {   // Fassung mit konstantem Tempo (konstant_pack.py): Raster und Tempo gehören zur Datei, Versatz entfällt
+      const d = data.songs[key] || (data.songs[key] = { updated: 0, guitar: "", tuning: "std", capo: 0, notes: "", chords: [], tabs: [] });
+      d.grid = t.grid; d.gridSrc = t.gridSrc; d.tempo = String(t.tempo); delete d.audioShift; d.updated = Date.now();
+    }
   }
+  saveData();
   return { saved, unmatched };
 }
 
@@ -1177,7 +1182,7 @@ function playerHTML() {
       <b id="plShift"></b><button data-pl="sh" data-d="0.01">+0,01</button><button data-pl="sh" data-d="0.1">+0,1</button>
       <button data-pl="one" title="Beim Hören genau auf einer Eins antippen">Eins hier</button></span>
     <button class="danger" data-pl="rm">Audio entfernen</button>
-    <p class="hint">${esc(pl.name)}${ud().grid ? " · Taktraster von Suno" : " · Taktraster aus dem Tempo"} – Teil oder Takt antippen = dorthin springen.</p></div>`;
+    <p class="hint">${esc(pl.name)}${ud().gridSrc === "konstant" ? " · konstantes Tempo" : ud().grid ? " · Taktraster von Suno" : " · Taktraster aus dem Tempo"} – Teil oder Takt antippen = dorthin springen.</p></div>`;
 }
 async function loadTrack() {
   if (current === null) return;
