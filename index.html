@@ -392,7 +392,7 @@ $("file").onchange = async (e) => {
   const files = [...e.target.files];
   if (!files.length) return;
   const loaded = [];
-  let restored = 0, suggested = null, audio = 0;
+  let restored = 0, suggested = null, audio = 0, replaced = 0;
   const unmatched = [], isAudio = (f) => /^audio\//.test(f.type) || /\.(mp3|m4a|wav|aac)$/i.test(f.name);
   files.sort((a, b) => isAudio(a) - isAudio(b));   // Audio zuletzt – Vorschläge legen evtl. erst die Songs an
   for (const f of files) {
@@ -407,7 +407,14 @@ $("file").onchange = async (e) => {
     let backup = null;
     try { backup = JSON.parse(text); } catch (err) {}
     // „buehne“ = Sicherungen vor der Umbenennung in Stagehand
-    if (backup && backup.app === "stagehand" && backup.kind === "vorschlag") { suggested = importSuggestion(backup); }
+    if (backup && backup.app === "stagehand" && backup.kind === "komplett") {   // ersetzt alles – nur nach Rückfrage
+      if (confirm(`Alle Songs und alles Eingetragene (Griffe, Tabs, Notizen, Songmaps …) durch diesen Stand ersetzen? (${backup.songs.length} Songs)`)) {
+        songs = backup.songs.map(x => parse(x.name, x.text));
+        songs.sort((a, b) => a.nr - b.nr || a.title.localeCompare(b.title));
+        data = backup.data; save(); saveData(); current = null; replaced = songs.length;
+      }
+    }
+    else if (backup && backup.app === "stagehand" && backup.kind === "vorschlag") { suggested = importSuggestion(backup); }
     else if (backup && (backup.app === "stagehand" || backup.app === "buehne")) { importBackup(backup); restored++; }
     else loaded.push(parse(f.name, text));
   }
@@ -415,6 +422,7 @@ $("file").onchange = async (e) => {
   renderList();
   $("hint").textContent = [loaded.length ? loaded.length + " Song(s) geladen." : "",
                            restored ? "Sicherung geladen." : "",
+                           replaced ? `Komplett ersetzt: ${replaced} Songs.` : "",
                            suggested ? `Vorschläge: ${suggested.filled} Song(s) ergänzt, ${suggested.added} neu angelegt – Vorhandenes bleibt.` : "",
                            audio ? `${audio} Song-Audio(s) gespeichert.` : "",
                            unmatched.length ? `Ohne passenden Song: ${unmatched.join(", ")}` : ""].filter(Boolean).join(" ");
