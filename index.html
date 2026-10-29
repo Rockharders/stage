@@ -266,6 +266,7 @@
     margin:0 0 16px; overflow:hidden; }
   .ckflash i { position:absolute; inset:0; opacity:0; background:var(--fg); }
   .ckflash.one i { background:var(--accent); }
+  .ckflash.one.change i { background:var(--mute); }
   /* schwarze Schlagzahl: nur sichtbar, solange die Fläche leuchtet */
   .ckflash b { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; color:#000;
     font-size:min(42vh, 40vw); font-weight:800; line-height:1; font-variant-numeric:tabular-nums; }
@@ -1841,7 +1842,10 @@ function drawClick() {   // pro Bild: kleine Anzeige im Kopf und (falls offen) d
     btn.classList.toggle("one", st.beat === 0);
     document.querySelectorAll(".ckbeats div").forEach((d, i) => d.classList.toggle("hit", i === st.beat));
     const fl = document.querySelector(".ckflash");
-    if (fl) { fl.classList.toggle("one", st.beat === 0); fl.querySelector("b").textContent = st.beat + 1; }
+    if (fl) {   // Fläche: die Eins eines neuen Teils leuchtet rot statt grün
+      const starts = (ud().map || []).map((p, i) => partStartBar(i)).slice(1);
+      fl.classList.toggle("change", st.beat === 0 && starts.includes(st.bar - 1));
+      fl.classList.toggle("one", st.beat === 0); fl.querySelector("b").textContent = st.beat + 1; }
     if (page === "click") clickPos(st);
   }
   const fade = 1 - 0.75 * Math.min(1, st.phase * 1.6);   // aufleuchten und abklingen
