@@ -173,8 +173,10 @@
   .bars div { position:relative; height:64px; border-radius:8px; border-top:4px solid; display:flex; align-items:center;
     justify-content:center; font-size:20px; font-weight:600; }
   .bars div small { position:absolute; left:7px; top:4px; font-size:11px; font-weight:500; color:var(--dim); }
-  .bars .plus { height:64px; border:2px dashed var(--line); border-radius:8px; background:none; color:var(--dim);
-    font-size:28px; font-weight:400; padding:0; }
+  .mapgrid { -webkit-user-select:none; user-select:none; -webkit-touch-callout:none; }
+  .mapgrid .ged input { -webkit-user-select:text; user-select:text; }
+  .mapgrid .lab .len { margin-left:auto; display:flex; gap:6px; }
+  .mapgrid .lab .len button { width:44px; height:40px; padding:0; font-size:22px; font-weight:500; }
   .bars i.mk { position:absolute; right:4px; top:4px; max-width:calc(100% - 26px); overflow:hidden; text-overflow:ellipsis;
     white-space:nowrap; font-style:normal; font-size:11px; font-weight:700; padding:1px 5px; border-radius:6px; color:#000; }
   .plmap i.mkl { position:absolute; top:-9px; bottom:-9px; width:3px; margin-left:-1px; border-radius:2px; pointer-events:none;
@@ -232,6 +234,10 @@
   .ckctl input[type=range] { width:140px; accent-color:var(--accent); }
   .ckctl .seg button { padding:14px 18px; border-radius:0; }
   /* Ansicht „Fläche“: ein großes Feld blinkt, sonst nichts */
+  #pClick { padding-bottom:20px; }
+  body:not(.listing)[data-page=click] #pClick.flashview { display:flex; flex-direction:column; height:100%; }
+  #pClick.flashview .ckflash { flex:1; height:auto; min-height:180px; margin-bottom:12px; }
+  #pClick.flashview .cknow { margin:0 0 14px; }
   .ckflash { position:relative; height:calc(100dvh - 250px); min-height:240px; border-radius:22px; background:var(--panel);
     margin:0 0 16px; overflow:hidden; }
   .ckflash i { position:absolute; inset:0; opacity:0; background:var(--fg); }
@@ -1105,8 +1111,7 @@ function renderMap() {
   plLast = ""; loadTrack(); plDraw(); markLines();
 }
 // Raster: eine Kachel pro Takt, durchgezählt über den ganzen Song
-// Teilname antippen: Bearbeitungsfeld direkt hier; „+“ am Ende = ein Takt mehr (lang drücken = einer weniger);
-// Kachel lang drücken = Marker setzen
+// Teilname antippen: Bearbeitungsfeld direkt hier; − / + rechts daneben = Länge; Kachel lang drücken = Marker setzen
 let mapEdit = null;
 const PALETTE = ["#9aa5b1", "#4db8ff", "#ffb02e", "#c6ff3d", "#b48cff", "#ff6b5e", "#2ec4b6", "#ff6bd1", "#f2f2f2"];
 function mapGrid(map) {
@@ -1123,9 +1128,9 @@ function mapGrid(map) {
           (mk.length ? `<i class="mk" style="background:${mk[0].color}">${esc(mk[0].label)}${mk.length > 1 ? " +" + (mk.length - 1) : ""}</i>` : "") + `</div>`;
       }
     }
-    tiles += `<button class="plus" data-a="bars" data-d="1" data-i="${i}" data-lp="minus" aria-label="Takt anhängen">+</button>`;
     return `<div class="lab" id="glab${i}" data-edit="${i}"><span style="color:${col}">${esc(p.name || "–")}</span>
-      <small>${p.bars} Takte${p.rep > 1 ? " × " + p.rep : ""}</small>${p.note ? `<span class="nt">${esc(p.note)}</span>` : ""}</div>
+      <small>${p.bars} Takte${p.rep > 1 ? " × " + p.rep : ""}</small>${p.note ? `<span class="nt">${esc(p.note)}</span>` : ""}
+      <span class="len"><button data-a="bars" data-d="-1" data-i="${i}" aria-label="Takt weniger">−</button><button data-a="bars" data-d="1" data-i="${i}" aria-label="Takt mehr">+</button></span></div>
       ${mapEdit === i ? partEditor(p, i, map.length) : ""}<div class="bars">${tiles}</div>`;
   }).join("") + `</div>`;
 }
@@ -1188,19 +1193,15 @@ function markLines() {   // Striche für die Marker auf der farbigen Leiste
     bar.insertAdjacentHTML("beforeend", `<i class="mkl" style="left:${x}px;background:${k.color}"></i>`);
   });
 }
-// Lang drücken: Kachel = Marker, „+“ = ein Takt weniger. Der Klick danach zählt nicht
+// Kachel lang drücken = Marker. Der Klick danach zählt nicht
 let lpTimer = 0, lpAt = 0, lpStart = null;
 $("pMap").addEventListener("pointerdown", (e) => {
-  const t = e.target.closest(".bars [data-bar], .bars [data-lp]");
+  const t = e.target.closest(".bars [data-bar]");
   if (!t) return;
   lpStart = { x: e.clientX, y: e.clientY };
   clearTimeout(lpTimer);
   lpTimer = setTimeout(() => {
-    lpAt = Date.now();
-    if (t.dataset.lp === "minus") {
-      const p = ud().map[+t.dataset.i]; p.bars = Math.max(1, p.bars - 1);
-      const y = $("scroll").scrollTop; touch(); renderMap(); $("scroll").scrollTop = y;
-    } else openMarker(+t.dataset.bar);
+    lpAt = Date.now(); openMarker(+t.dataset.bar);
   }, 550);
 });
 ["pointerup", "pointercancel"].forEach(ev => $("pMap").addEventListener(ev, () => clearTimeout(lpTimer)));
@@ -1223,7 +1224,7 @@ $("pMap").addEventListener("click", (e) => {
   if (Date.now() - lpAt < 700) return;          // war ein langer Druck
   const tile = e.target.closest("[data-bar]");
   if (tile && audioMaster()) { plSeek(barStart(+tile.dataset.bar)); return; }
-  const ed = e.target.closest("[data-edit]");
+  const ed = !e.target.closest("button") && e.target.closest("[data-edit]");
   if (ed) {   // Teilname im Raster antippen: Bearbeitungsfeld auf/zu
     mapEdit = mapEdit === +ed.dataset.edit ? null : +ed.dataset.edit;
     const y = $("scroll").scrollTop; renderMap(); $("scroll").scrollTop = y; return;
@@ -1399,7 +1400,14 @@ function plPlay() {
   src.buffer = pl.buf; gain.gain.value = pl.song ? 1 : 0;      // Song stumm = nur Click im Raster des Songs
   src.connect(gain); gain.connect(ctx.destination); pl.gain = gain;
   pl.startedAt = ctx.currentTime - pl.offset; src.start(0, pl.offset);
-  src.onended = () => { if (pl.src === src) { pl.src = null; pl.playing = false; pl.offset = 0; renderDock(); drawClick(); } };
+  src.onended = () => {
+    if (pl.src !== src) return;
+    const m = beatsPerBar(), sbEnd = barAtTime(pl.buf.duration) * m;   // Song zu Ende: Click läuft im selben Raster weiter
+    pl.src = null; pl.playing = false; pl.offset = 0;
+    if (!clockLive()) clk.t0 = performance.now();
+    clk.on = true; clk.offset = globalBeat(performance.now()) - sbEnd; clk.beeped = -1e9; clk.shape = "";
+    renderDock(); drawClick(); if (page === "click") renderClick();
+  };
   pl.src = src; pl.playing = true; pl.sched = pl.offset - 0.001;
   plLoop(); drawClick();
   const t0 = ctx.currentTime, from = pl.offset;
@@ -1890,9 +1898,13 @@ function renderClick() {
       <label>Hell <input type="range" id="ckBright" min="10" max="100" step="5" value="${Math.round(clickBright() * 100)}"></label>
       <div class="seg"><button data-ckview="beats" class="${flash ? "" : "on"}">Felder</button><button data-ckview="flash" class="${flash ? "on" : ""}">Fläche</button></div>
     </div>`;
-  if (flash) {
-    $("pClick").innerHTML = `<div class="ckflash"><i></i><b></b></div>${ctl}`;
-    clk.shape = ""; clk.last = ""; drawClick(); return;
+  $("pClick").classList.toggle("flashview", flash);
+  const mapHTML = map.length ? `<div class="mapbar ckmap">${map.map((p, i) => `<a href="#" data-goto="${i}" style="flex:${p.bars * p.rep};background:${partColor(p)}">
+      ${esc(p.name || "–")}<small>${p.bars}${p.rep > 1 ? " × " + p.rep : ""}</small></a>`).join("")}<i class="head"></i></div>
+      <div class="cknow"><b id="ckPart"></b><span id="ckPartPos"></span><span class="nx" id="ckNext"></span></div>` : "";
+  if (flash) {   // Fläche: großes Licht, darunter Songmap mit Laufmarke und „als Nächstes“
+    $("pClick").innerHTML = `<div class="ckflash"><i></i><b></b></div>${mapHTML}${ctl}`;
+    clk.shape = ""; clk.last = ""; drawClick(); clickPos(st); return;
   }
   $("pClick").innerHTML = `
     <div class="ckbeats">${Array.from({ length: st.sig.beats }, (_, i) => `<div class="${i ? "" : "one"}">${i + 1}</div>`).join("")}</div>
@@ -1904,9 +1916,7 @@ function renderClick() {
       <div><span class="cap">Taktart</span><span class="v">${st.sig.num}/${st.sig.den}</span></div>
       <div><span class="cap">Quelle</span><span class="v" id="ckSrc">${clickSource()}</span></div>
     </div>
-    ${map.length ? `<div class="mapbar ckmap">${map.map((p, i) => `<a href="#" data-goto="${i}" style="flex:${p.bars * p.rep};background:${partColor(p)}">
-      ${esc(p.name || "–")}<small>${p.bars}${p.rep > 1 ? " × " + p.rep : ""}</small></a>`).join("")}<i class="head"></i></div>
-      <div class="cknow"><b id="ckPart"></b><span id="ckPartPos"></span><span class="nx" id="ckNext"></span></div>` : ""}
+    ${mapHTML}
     ${ctl}
     <p class="hint">${st.audio ? "Läuft mit dem Song-Audio (Leiste unten). Zurück auf den Anfang = Click ohne Song." :
       live ? "Tempo kommt vom MC8 (MIDI-Clock). Tap am MC8 ändert es hier mit." :
