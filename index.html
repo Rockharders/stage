@@ -317,6 +317,7 @@
   </div>
   <div id="songs"></div>
   <p class="hint" id="hint"></p>
+  <p class="hint" id="offline"></p>
 </div>
 <main class="page" id="pText"></main>
 <div class="page" id="pInfo"></div>
@@ -1782,6 +1783,14 @@ async function midi() {
 
 async function keepAwake() { try { if ("wakeLock" in navigator) await navigator.wakeLock.request("screen"); } catch (e) {} }
 document.addEventListener("visibilitychange", () => { if (!document.hidden) keepAwake(); });
+// Offline: App im Gerät zwischenspeichern (sw.js). Geht nur in Browsern mit Service Worker (Safari, Home-Bildschirm)
+if ("serviceWorker" in navigator && location.protocol === "https:") {
+  navigator.serviceWorker.register("sw.js").then(() => navigator.serviceWorker.ready)
+    .then(() => { $("offline").textContent = "Offline bereit – die App startet auch ohne Netz."; })
+    .catch(() => { $("offline").textContent = "Offline nicht verfügbar (Zwischenspeichern fehlgeschlagen)."; });
+} else if (location.protocol === "https:") {
+  $("offline").textContent = "Offline nicht möglich in diesem Browser – Stagehand braucht hier Netz zum Starten.";
+}
 
 restore(); fontSize(0); renderList(); setPage("text"); midi(); keepAwake();
 </script>
