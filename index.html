@@ -141,6 +141,13 @@
   #followBtn { display:none; }
   body[data-page=text] #followBtn { display:block; }
   body.follow #pText section:not(.current) { opacity:.4; }
+  /* Mitlesen Zeile / Wort (Zeiten aus Suno): aktuelle Zeile hell, im Wortmodus das gesungene Wort in Akzentfarbe */
+  body.follow-fine #pText section.current { opacity:1; }
+  body.follow-fine #pText .ln { opacity:.45; transition:opacity .15s; }
+  body.follow-fine #pText .ln.on { opacity:1; color:var(--fg); }
+  body.follow-word #pText .ln.on .w { opacity:.45; }
+  body.follow-word #pText .ln.on .w.sung { opacity:1; }
+  body.follow-word #pText .ln.on .w.cw { opacity:1; color:var(--accent); }
   .mplayer .tr { display:flex; align-items:center; gap:10px; }
   .mplayer .tr > button { height:52px; padding:0 16px; font-size:18px; font-weight:600; white-space:nowrap; }
   .mplayer .play { min-width:130px; }
@@ -474,7 +481,7 @@ $("file").onchange = async (e) => {
   const files = [...e.target.files];
   if (!files.length) return;
   const loaded = [];
-  let restored = 0, suggested = null, audio = 0, replaced = 0, declined = false;
+  let restored = 0, suggested = null, audio = 0, replaced = 0, declined = false, timed = 0;
   const unmatched = [], isAudio = (f) => /^audio\//.test(f.type) || /\.(mp3|m4a|wav|aac)$/i.test(f.name);
   files.sort((a, b) => isAudio(a) - isAudio(b));   // Audio zuletzt – Vorschläge legen evtl. erst die Songs an
   toast("Lädt …", 120000);
@@ -504,6 +511,7 @@ $("file").onchange = async (e) => {
       } else declined = true;
     }
     else if (backup && backup.app === "stagehand" && backup.kind === "vorschlag") { suggested = importSuggestion(backup); }
+    else if (backup && backup.app === "stagehand" && backup.kind === "zeiten") { timed = importTimes(backup); }
     else if (backup && (backup.app === "stagehand" || backup.app === "buehne")) { importBackup(backup); restored++; }
     else loaded.push(parse(f.name, text));
   }
@@ -515,6 +523,7 @@ $("file").onchange = async (e) => {
                            replaced ? `Komplett ersetzt: ${replaced} Songs.` : "",
                            suggested ? `Vorschläge: ${suggested.filled} Song(s) ergänzt, ${suggested.added} neu angelegt – Vorhandenes bleibt.` : "",
                            audio ? `${audio} Song-Audio(s) gespeichert.` : "",
+                           timed ? `Textzeiten für ${timed} Song(s) – Mitlesen nach Zeile und Wort.` : "",
                            unmatched.length ? `Ohne passenden Song: ${unmatched.join(", ")}` : "",
                            declined ? "Ersetzen abgebrochen – nichts geändert." : ""].filter(Boolean).join(" ");
   $("hint").textContent = msg;
@@ -568,6 +577,16 @@ async function importAudioPack(f) {
   return { saved, unmatched };
 }
 
+// Textzeiten (suno/textzeiten.py): pro Song Zeilen mit Startzeit und Wortzeiten – ersetzt nur diese Zeiten
+function importTimes(b) {
+  let n = 0;
+  for (const [key, lyr] of Object.entries(b.songs || {})) {
+    const d = data.songs[key] || (data.songs[key] = { updated: 0, guitar: "", tuning: "std", capo: 0, notes: "", chords: [], tabs: [] });
+    d.lyrics = lyr.slice().sort((a, c) => a.t - c.t); n++;
+  }
+  saveData(); lyrLine = null;
+  return n;
+}
 // Vorschlagsdatei (z. B. aus Suno): Tempo, Takt, Songmap, Taktraster, Liedtext – nur dort, wo noch nichts eingetragen ist
 function importSuggestion(b) {
   let added = 0, filled = 0;
@@ -781,10 +800,11 @@ function renderSong() {
   const secs = sections();
   section = Math.min(section, Math.max(0, secs.length - 1));
   $("pText").innerHTML = (secs.length ? secs.map((sec, i) =>
-    `<section data-i="${i}">${sec.label ? `<div class="label">${esc(sec.label)}</div>` : ""}<p>${esc(sec.lines.join("\n"))}</p></section>`).join("")
+    `<section data-i="${i}">${sec.label ? `<div class="label">${esc(sec.label)}</div>` : ""}<p>${sec.lines.map((ln, l) =>
+      `<span class="ln" data-l="${l}">${ln.split(/(\s+)/).map(w => /\S/.test(w) ? `<span class="w">${esc(w)}</span>` : esc(w)).join("")}</span>`).join("\n")}</p></section>`).join("")
     : `<p class="note">Kein Text vorhanden.</p>`) +
     (typeof ud().text === "string" ? `<p class="edited">Text am iPad geändert.</p>` : "");
-  highlight(false);
+  highlight(false); lyrLine = null;
 }
 $("editText").onclick = () => {
   if (current === null) return;
@@ -1828,10 +1848,51 @@ function partSections() {
   });
   return out;
 }
-const follow = () => setting("stage-follow") === "1";
+const FOLLOW = ["Mitlesen", "Teil", "Zeile", "Wort"];   // aus → Teil → Zeile → Wort → aus
+const followMode = () => +setting("stage-follow") || 0;
+const follow = () => followMode() > 0;
 let followPart = -2;
+// Zeiten der Zeilen und Wörter (aus Suno, im Raster der geladenen MP3): ud().lyrics = [{s, l, txt, t, w: [Zeit je Wort]}]
+let lyrLine = null, lyrWord = -1;
+function lyrics() {   // nur Zeilen, deren Text noch zum angezeigten Text passt
+  const secs = sections();
+  return (ud().lyrics || []).filter(x => secs[x.s] && secs[x.s].lines[x.l] !== undefined &&
+    secs[x.s].lines[x.l].trim() === x.txt);
+}
+function songTime(st) {   // Sekunde im Song – aus der MP3 oder aus Takt und Raster (Click ohne Song)
+  if (st.audio) return plPos();
+  const bar = st.sb / st.sig.beats, k = Math.floor(bar);
+  return barStart(k) + (bar - k) * (barStart(k + 1) - barStart(k));
+}
+function fineTick(st) {
+  const lyr = lyrics();
+  if (!lyr.length) return false;
+  const t = songTime(st) + 0.12;                     // knapp vor dem Einsatz hell
+  let cur = null;
+  for (const x of lyr) if (x.t <= t) cur = x; else break;
+  if (cur !== lyrLine) {
+    document.querySelectorAll("#pText .ln.on").forEach(el => el.classList.remove("on"));
+    lyrLine = cur; lyrWord = -1;
+    if (cur) {
+      if (section !== cur.s) { section = cur.s; highlight(false); }
+      const el = document.querySelector(`#pText section[data-i="${cur.s}"] .ln[data-l="${cur.l}"]`);
+      if (el) { el.classList.add("on"); if (page === "text") el.scrollIntoView({ behavior: "smooth", block: "center" }); }
+    }
+  }
+  if (cur && followMode() === 3) {
+    let wi = -1;
+    (cur.w || []).forEach((wt, i) => { if (wt <= t) wi = i; });
+    if (wi !== lyrWord) {
+      lyrWord = wi;
+      const words = document.querySelectorAll(`#pText section[data-i="${cur.s}"] .ln[data-l="${cur.l}"] .w`);
+      words.forEach((el, i) => { el.classList.toggle("sung", i <= wi); el.classList.toggle("cw", i === wi); });
+    }
+  }
+  return true;
+}
 function followTick(st) {
   if (!follow() || current === null) return;
+  if (followMode() >= 2 && fineTick(st)) return;    // ohne Zeiten: wie „Teil“
   const here = st.bar >= 1 ? partAt(st.bar - 1) : null, i = here ? here.i : -1;
   if (i === followPart) return;
   followPart = i;
@@ -1839,12 +1900,16 @@ function followTick(st) {
   if (k === null || k === undefined) return;
   section = k; highlight(page === "text");
 }
-function setFollow(on) {
-  setting("stage-follow", on ? "1" : "0"); followPart = -2;
-  document.body.classList.toggle("follow", on); $("followBtn").classList.toggle("on", on);
-  if (on) drawClick();
+function setFollow(mode) {
+  setting("stage-follow", String(mode)); followPart = -2; lyrLine = null;
+  document.querySelectorAll("#pText .ln.on, #pText .w.sung, #pText .w.cw").forEach(el => el.classList.remove("on", "sung", "cw"));
+  document.body.classList.toggle("follow", mode > 0);
+  document.body.classList.toggle("follow-fine", mode >= 2);
+  document.body.classList.toggle("follow-word", mode === 3);
+  $("followBtn").classList.toggle("on", mode > 0); $("followBtn").textContent = FOLLOW[mode];
+  if (mode) drawClick();
 }
-$("followBtn").onclick = () => setFollow(!follow());
+$("followBtn").onclick = () => setFollow((followMode() + 1) % 4);
 // Vorwarnung vor dem nächsten Marker (TEXT und CLICK): „→ G3 in 2 Takten“, auf dem Schlag „JETZT“
 let cueLast = "";
 function cueTick(st) {
@@ -2040,7 +2105,7 @@ async function midi() {
 
 async function keepAwake() { try { if ("wakeLock" in navigator) await navigator.wakeLock.request("screen"); } catch (e) {} }
 document.addEventListener("visibilitychange", () => { if (!document.hidden) keepAwake(); });
-setFollow(follow());
+setFollow(followMode());
 // Offline: App im Gerät zwischenspeichern (sw.js). Geht nur in Browsern mit Service Worker (Safari, Home-Bildschirm)
 if ("serviceWorker" in navigator && location.protocol === "https:") {
   navigator.serviceWorker.register("sw.js").then(() => navigator.serviceWorker.ready)
