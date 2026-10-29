@@ -213,7 +213,24 @@
     color:var(--dim); letter-spacing:.12em; text-transform:uppercase; margin:4px 0 0; }
 
   /* ---------- CLICK ---------- */
-  .ckbeats { display:flex; gap:10px; height:min(34vh, 300px); margin:0 0 12px; }
+  .ckbeats { display:flex; gap:10px; height:min(51vh, 450px); margin:0 0 12px; }
+  #pClick { position:relative; }
+  .cktools { position:absolute; top:12px; right:20px; z-index:3; display:flex; align-items:center; gap:8px; }
+  .cktools button { height:44px; padding:0 16px; border-radius:22px; font-size:16px; font-weight:600; background:rgba(28,28,31,.85); }
+  .cktools .sun { width:44px; padding:0; font-size:20px; }
+  .cktools input { width:150px; accent-color:var(--accent); display:none; }
+  .cktools.bright input { display:block; }
+  .cktools.bright .sun { border-color:var(--fg); }
+  .ckinfo .cktools { position:static; margin-left:auto; align-self:center; }
+  /* Fläche: Songmap groß als Zeitleiste, läuft mit – Takte leicht eingezeichnet, Kopf bei einem Drittel */
+  .cktl { position:relative; height:120px; margin:0 -20px 10px; overflow:hidden; }
+  .cktrack { position:absolute; left:0; top:0; bottom:0; will-change:transform; }
+  .cktrack a { position:absolute; top:0; bottom:0; border-radius:10px; color:#000; text-decoration:none; overflow:hidden;
+    padding:10px 12px; font-size:22px; font-weight:700; white-space:nowrap;
+    background-image:repeating-linear-gradient(to right, transparent 0 calc(var(--bw) - 2px), rgba(0,0,0,.28) calc(var(--bw) - 2px) var(--bw)); }
+  .cktrack a small { display:block; font-size:15px; font-weight:500; opacity:.7; }
+  .cktl .tlhead { position:absolute; top:0; bottom:0; left:33%; width:4px; margin-left:-2px; background:#fff; border-radius:2px;
+    box-shadow:0 0 0 2px #000; pointer-events:none; }
   .ckbeats div { flex:1; min-width:0; border-radius:16px; background:var(--panel); display:flex; align-items:center;
     justify-content:center; font-size:clamp(28px, 7vw, 76px); font-weight:700; color:#3a3a40; }
   .ckbeats div.hit { background:var(--fg); color:#000; box-shadow:0 0 40px rgba(255,255,255,.25); }
@@ -1364,8 +1381,11 @@ function dockSize() {
 $("dockBtn").onclick = () => { setting("stage-dock", setting("stage-dock") === "0" ? "1" : "0"); renderDock(); };
 window.addEventListener("resize", dockSize);
 function playerHTML() {
-  if (!pl.buf) return `<div class="mplayer"><div class="tr"><button data-pl="load">♪ Song-Audio laden</button>
-    <span class="t">${pl.loading ? "lädt …" : "MP3 des Songs – dann laufen Songmap, Text und Click mit."}</span></div></div>`;
+  if (!pl.buf) return `<div class="mplayer"><div class="tr">
+    <button class="play primary" data-pl="clk" id="plPlay">${clk.on ? "❚❚ Stopp" : "▶ Click"}</button>
+    <button data-pl="click" id="plClick" class="flbtn ${pl.click ? "on" : ""}" title="Click-Ton – das Licht läuft immer"><i class="fl"></i><span>Ton</span></button>
+    <div class="now"><span class="t">${pl.loading ? "lädt …" : "Click ohne Song – Tempo vom MC8 oder aus dem Song"}</span></div>
+    <button data-pl="load">♪ Song-Audio</button></div></div>`;
   const open = setting("stage-pl-more") === "1";
   return `<div class="mplayer${open ? " open" : ""}"><div class="tr">
     <button class="play primary" data-pl="play" id="plPlay">${pl.playing ? "❚❚ Pause" : "▶ Play"}</button>
@@ -1512,6 +1532,7 @@ function plAction(a, b) {
   if (a === "load") return $("plFile").click();
   if (a === "more") { const m = b.closest(".mplayer"); m.classList.toggle("open"); setting("stage-pl-more", m.classList.contains("open") ? "1" : "0"); return; }
   if (a === "click") { setTone(!pl.click); return; }   // Click-Ton geht auch ohne MP3
+  if (a === "clk") { try { plCtx().resume(); } catch (e) {} setClick(!clk.on); return; }
   if (!pl.buf) return;
   if (a === "play") { if (pl.playing) plStop(); else plPlay(); plLast = ""; plDraw(); return; }
   if (a === "start") { plSeek(0); plLast = ""; plDraw(); return; }
@@ -1760,6 +1781,7 @@ function setClick(on) {
   clk.on = on; setting("stage-click", on ? "1" : "0");
   if (on) { if (!clockLive()) clk.t0 = performance.now(); downbeat(); }
   clk.shape = ""; drawClick();
+  if (!pl.buf && current !== null) renderDock();
   if (page === "click") renderClick();
 }
 function tapTempo() {
@@ -1809,7 +1831,9 @@ function drawClick() {   // pro Bild: kleine Anzeige im Kopf und (falls offen) d
     if ($("ckBpm")) { $("ckBpm").textContent = st.bpm ? Math.round(st.bpm) : "–"; $("ckSrc").textContent = clickSource(); }
   }
   followTick(st); cueTick(st);
-  if (!st.running || !st.bpm) { btn.firstChild.style.opacity = 0; btn.classList.remove("lit"); return; }
+  if (page === "click") tlMove(st);
+  const pb = !st.audio && $("plClick");
+  if (!st.running || !st.bpm) { btn.firstChild.style.opacity = 0; btn.classList.remove("lit"); if (pb) { pb.firstChild.style.opacity = 0; pb.classList.remove("lit"); } return; }
   clockBeeps(st);
   const key = st.bar + "." + st.beat;
   if (key !== clk.last) {   // neuer Schlag
@@ -1823,6 +1847,7 @@ function drawClick() {   // pro Bild: kleine Anzeige im Kopf und (falls offen) d
   const fade = 1 - 0.75 * Math.min(1, st.phase * 1.6);   // aufleuchten und abklingen
   const flash = Math.max(0, 1 - st.phase * 2.2) * clickBright() * (st.beat === 0 ? 1 : OFFBEAT);   // kurz voll, dann dunkel
   btn.firstChild.style.opacity = flash; btn.classList.toggle("lit", flash > 0.5);
+  if (pb) { pb.firstChild.style.opacity = flash; pb.classList.toggle("one", st.beat === 0); pb.classList.toggle("lit", flash > 0.5); }
   if (page === "click") {
     const box = document.querySelector(".ckbeats div.hit"); if (box) box.style.opacity = 0.35 + 0.65 * fade;
     const fl = document.querySelector(".ckflash i");
@@ -1948,28 +1973,26 @@ function clickPos(st) {   // Takt, Teil der Songmap, was als Nächstes kommt
   set("ckPartPos", `Takt ${pos % p.bars + 1} von ${p.bars}` + (p.rep > 1 ? ` · ${Math.floor(pos / p.bars) + 1}. Durchgang` : ""));
   set("ckNext", map[i + 1] ? `→ ${map[i + 1].name || "–"} ${left === 1 ? "im nächsten Takt" : "in " + left + " Takten"}` : `→ Ende in ${left}`);
 }
+const TL_BW = 44;   // Breite eines Takts in der Fläche-Zeitleiste (px)
 function renderClick() {
   if (current === null) return;
-  const st = clickState(), map = ud().map || [], live = clockLive() || st.audio;
-  const saved = songTempo(), tapDiff = clk.tapBpm && clk.tapBpm !== saved, flash = setting("stage-click-view") === "flash";
-  const ctl = `<div class="ckctl">
-      <button class="${st.running ? "" : "primary"}" data-ck="run">${st.running ? "Stopp" : "Start"}</button>
-      <button data-ck="tone" class="${pl.click ? "on" : ""}">Ton</button>
-      <button data-ck="one" ${clk.on && !st.audio ? "" : "disabled"}>Eins</button>
-      <button class="tap" data-ck="tap" ${live ? "disabled" : ""}>TAP</button>
-      <button data-ck="-1" ${live || !st.bpm ? "disabled" : ""}>−</button>
-      <button data-ck="1" ${live || !st.bpm ? "disabled" : ""}>+</button>
-      ${tapDiff && !live ? `<button data-ck="save">${clk.tapBpm} als Songtempo</button>` : ""}
-      <label>Hell <input type="range" id="ckBright" min="10" max="100" step="5" value="${Math.round(clickBright() * 100)}"></label>
-      <div class="seg"><button data-ckview="beats" class="${flash ? "" : "on"}">Felder</button><button data-ckview="flash" class="${flash ? "on" : ""}">Fläche</button></div>
-    </div>`;
+  const st = clickState(), map = ud().map || [], flash = setting("stage-click-view") === "flash";
+  // Start/Stopp, Ton und Tempo kommen aus der Leiste unten bzw. vom MC8 – hier nur Ansicht und Helligkeit
+  const ctl = `<div class="cktools"><input type="range" id="ckBright" min="10" max="100" step="5" value="${Math.round(clickBright() * 100)}" aria-label="Helligkeit">
+      <button class="sun" data-ck="bright" aria-label="Helligkeit">☀︎</button>
+      <button data-ckview="${flash ? "beats" : "flash"}">${flash ? "Fläche" : "Felder"}</button></div>`;
   $("pClick").classList.toggle("flashview", flash);
   const mapHTML = map.length ? `<div class="mapbar ckmap">${map.map((p, i) => `<a href="#" data-goto="${i}" style="flex:${p.bars * p.rep};background:${partColor(p)}">
       ${esc(p.name || "–")}<small>${p.bars}${p.rep > 1 ? " × " + p.rep : ""}</small></a>`).join("")}<i class="head"></i></div>
       <div class="cknow"><b id="ckPart"></b><span id="ckPartPos"></span><span class="nx" id="ckNext"></span></div>` : "";
-  if (flash) {   // Fläche: großes Licht, darunter Songmap mit Laufmarke und „als Nächstes“
-    $("pClick").innerHTML = `<div class="ckflash"><i></i><b></b></div>${mapHTML}${ctl}`;
-    clk.shape = ""; clk.last = ""; drawClick(); clickPos(st); return;
+  if (flash) {   // Fläche: großes Licht, darunter die Songmap als mitlaufende Zeitleiste und „als Nächstes“
+    let start = 0;
+    const track = map.map((p, i) => { const len = p.bars * p.rep, a = `<a href="#" data-goto="${i}" style="left:${start * TL_BW}px;width:${len * TL_BW - 4}px;background-color:${partColor(p)}">
+      ${esc(p.name || "–")}<small>${p.bars}${p.rep > 1 ? " × " + p.rep : ""}</small></a>`; start += len; return a; }).join("");
+    $("pClick").innerHTML = `${ctl}<div class="ckflash"><i></i><b></b></div>` + (map.length ? `<div class="cktl" style="--bw:${TL_BW}px">
+      <div class="cktrack" style="width:${start * TL_BW}px">${track}</div><i class="tlhead"></i></div>
+      <div class="cknow"><b id="ckPart"></b><span id="ckPartPos"></span><span class="nx" id="ckNext"></span></div>` : "");
+    clk.shape = ""; clk.last = ""; drawClick(); clickPos(st); tlMove(st); return;
   }
   $("pClick").innerHTML = `
     <div class="ckbeats">${Array.from({ length: st.sig.beats }, (_, i) => `<div class="${i ? "" : "one"}">${i + 1}</div>`).join("")}</div>
@@ -1980,16 +2003,18 @@ function renderClick() {
       <div><span class="cap">Schlag</span><span class="v" id="ckBeat">–</span></div>
       <div><span class="cap">Taktart</span><span class="v">${st.sig.num}/${st.sig.den}</span></div>
       <div><span class="cap">Quelle</span><span class="v" id="ckSrc">${clickSource()}</span></div>
+      ${ctl}
     </div>
-    ${mapHTML}
-    ${ctl}
-    <p class="hint">${st.audio ? "Läuft mit dem Song-Audio (Leiste unten). Zurück auf den Anfang = Click ohne Song." :
-      live ? "Tempo kommt vom MC8 (MIDI-Clock). Tap am MC8 ändert es hier mit." :
-      "Läuft mit dem Songtempo oder deinem Tap hier. Sobald der MC8 seine MIDI-Clock ans iPad schickt, übernimmt er."}
-      „Eins“ macht den aktuellen Schlag zur Eins von Takt 1 – zum Beispiel beim Einzählen.</p>`;
+    ${mapHTML}`;
   clk.shape = ""; clk.last = "";
   drawClick();
   if (!st.running) clickPos(st);
+}
+function tlMove(st) {   // Zeitleiste so verschieben, dass die aktuelle Stelle unter dem Kopf (ein Drittel) steht
+  const tr = document.querySelector(".cktrack");
+  if (!tr) return;
+  const x = Math.max(0, st.sb / st.sig.beats) * TL_BW - tr.parentNode.offsetWidth / 3;
+  tr.style.transform = `translateX(${-x}px)`;
 }
 $("clickBtn").onclick = () => setClick(!clk.on);
 $("pClick").addEventListener("input", (e) => {
@@ -2019,6 +2044,7 @@ $("pClick").addEventListener("click", (e) => {
     return setClick(!clk.on);
   }
   if (a === "tone") return setTone(!pl.click);
+  if (a === "bright") { b.parentNode.classList.toggle("bright"); return; }
   if (a === "one") { downbeat(); clk.last = ""; return; }
   if (a === "save") { ud().tempo = String(clk.tapBpm); touch(); clk.tapBpm = 0; renderMeta(); renderClick(); return; }
   if (a === "1" || a === "-1") { setTempo(() => { clk.tapBpm = Math.max(30, Math.min(300, Math.round(clickBpm()) + +a)); }); renderClick(); }
