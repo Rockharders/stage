@@ -127,12 +127,20 @@
   .cpick { flex:none; width:36px; height:36px; border-radius:50%; border:2px solid var(--line); overflow:hidden; cursor:pointer; }
   .cpick input { opacity:0; width:100%; height:100%; border:0; padding:0; cursor:pointer; }
   .part .cstd { padding:6px 10px; font-size:14px; color:var(--dim); }
-  /* Abspielen zum Prüfen: Song-Audio + Click über der Songmap */
-  body:not(.listing)[data-page=map] #pMap { display:flex; flex-direction:column; min-height:100%; padding-bottom:0; }
-  .mapbody { flex:1; padding-bottom:30px; }
-  .mplayer { position:sticky; bottom:0; z-index:3; margin:0 -20px; padding:12px 20px calc(env(safe-area-inset-bottom) + 12px);
+  /* Abspielleiste: Song-Audio + Click, unten auf allen Seiten, mit ♪ ein- und ausblendbar */
+  #dock { flex:none; display:none; }
+  body.docked:not(.listing) #dock { display:block; }
+  .mplayer { padding:12px 20px calc(env(safe-area-inset-bottom) + 12px);
     background:var(--panel); border-top:1px solid var(--line); box-shadow:0 -10px 30px rgba(0,0,0,.55);
     display:flex; flex-direction:column; gap:10px; }
+  #fab { position:fixed; right:16px; bottom:calc(var(--dockh, 0px) + env(safe-area-inset-bottom) + 14px); z-index:6;
+    display:none; gap:8px; }
+  body:not(.listing) #fab { display:flex; }
+  #fab button { height:48px; min-width:52px; border-radius:24px; font-size:17px; font-weight:600; box-shadow:0 4px 18px rgba(0,0,0,.6); }
+  #fab button.on { background:var(--accent); border-color:var(--accent); color:#000; }
+  #followBtn { display:none; }
+  body[data-page=text] #followBtn { display:block; }
+  body.follow #pText section:not(.current) { opacity:.4; }
   .mplayer .tr { display:flex; align-items:center; gap:10px; }
   .mplayer .tr > button { height:52px; padding:0 16px; font-size:18px; font-weight:600; white-space:nowrap; }
   .mplayer .play { min-width:130px; }
@@ -165,6 +173,33 @@
   .bars div { position:relative; height:64px; border-radius:8px; border-top:4px solid; display:flex; align-items:center;
     justify-content:center; font-size:20px; font-weight:600; }
   .bars div small { position:absolute; left:7px; top:4px; font-size:11px; font-weight:500; color:var(--dim); }
+  .bars .plus { height:64px; border:2px dashed var(--line); border-radius:8px; background:none; color:var(--dim);
+    font-size:28px; font-weight:400; padding:0; }
+  .bars i.mk { position:absolute; right:4px; top:4px; max-width:calc(100% - 26px); overflow:hidden; text-overflow:ellipsis;
+    white-space:nowrap; font-style:normal; font-size:11px; font-weight:700; padding:1px 5px; border-radius:6px; color:#000; }
+  .plmap i.mkl { position:absolute; top:-9px; bottom:-9px; width:3px; margin-left:-1px; border-radius:2px; pointer-events:none;
+    box-shadow:0 0 0 1px #000; }
+  .ged { background:var(--panel); border-radius:14px; padding:12px 14px; margin:0 0 10px; display:flex; flex-wrap:wrap;
+    gap:10px 14px; align-items:center; }
+  .ged input { background:none; border:0; border-bottom:1px solid var(--line); padding:4px 2px; outline:none; min-width:0; }
+  .ged input.nm { flex:1 1 220px; font-size:22px; font-weight:600; }
+  .ged input.nt { flex:1 1 100%; font-size:17px; color:var(--dim); }
+  .ged .stepper b { min-width:0; font-size:18px; white-space:nowrap; }
+  .ged .stepper button, .ged .mv button { padding:6px 12px; font-size:16px; }
+  .ged .mv { display:flex; gap:6px; }
+  .dots { display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
+  .dots button { width:34px; height:34px; border-radius:50%; padding:0; border:2px solid transparent; }
+  .dots button.on { border-color:var(--fg); }
+  #cue { position:fixed; left:16px; bottom:calc(var(--dockh, 0px) + env(safe-area-inset-bottom) + 14px); z-index:6; display:none;
+    padding:10px 18px; border-radius:24px; background:var(--panel2); border:2px solid var(--mk, var(--fg)); font-size:22px;
+    font-weight:700; box-shadow:0 4px 18px rgba(0,0,0,.6); }
+  #cue.show { display:block; }
+  #cue.now { background:var(--mk, var(--fg)); color:#000; }
+  #marker .mbeats, #marker .mopts { display:flex; flex-wrap:wrap; gap:8px; margin:10px 0 16px; }
+  #marker .mopts button { color:#000; font-weight:700; border:0; min-width:96px; }
+  #marker .mlist { display:flex; flex-direction:column; gap:8px; margin:0 0 16px; }
+  #marker .mfree { display:flex; gap:8px; }
+  #marker .mfree input { flex:1; background:var(--panel2); border:1px solid var(--line); border-radius:10px; padding:9px 12px; font-size:17px; }
   .bars .again { grid-column:1 / -1; height:auto; border:0; justify-content:flex-start; font-size:12px; font-weight:500;
     color:var(--dim); letter-spacing:.12em; text-transform:uppercase; margin:4px 0 0; }
 
@@ -326,6 +361,10 @@
 <div class="page" id="pTabs"></div>
 <div class="page" id="pClick"></div>
 </div>
+<div id="dock"></div>
+<div id="cue"></div>
+<div id="fab"><button id="followBtn">Mitlesen</button><button id="dockBtn" aria-label="Abspielleiste ein/aus">♪</button></div>
+<div class="sheet" id="marker"><div class="box"></div></div>
 
 <div class="sheet" id="editor"><div class="box"></div></div>
 <div class="sheet" id="picker"><div class="box"><h3></h3><div class="ptech"></div><div class="pgrid"></div></div></div>
@@ -774,12 +813,13 @@ function highlight(scroll = true) {
 }
 function openSong(i) {
   if (i < 0 || i >= songs.length) return;
-  current = i; section = 0;
-  plStop(); pl.key = null; pl.buf = null;
+  current = i; section = 0; mapEdit = null; followPart = -2;
+  plStop(); pl.key = null; pl.buf = null; pl.offset = 0;
   clickSong();
   document.body.classList.remove("listing");
   ["editor", "picker", "textbox", "lyrics"].forEach(id => $(id).classList.remove("open"));
   renderSong(); renderList(); setPage("text");   // Songwechsel landet immer beim Text
+  renderDock(); loadTrack();
 }
 function openSongNr(nr) {
   const i = songs.findIndex(s => s.nr === nr);
@@ -1062,26 +1102,111 @@ function renderMap() {
     <div class="field" style="margin-top:22px"><span class="cap">Teil anhängen</span><div class="chips">
       ${PARTS.map(n => `<button class="chip" data-add="${n}">+ ${n}</button>`).join("")}
       ${!map.length && fromText ? `<button class="chip" data-a="fromtext">Aus Songtext (${fromText} Teile)</button>` : ""}</div></div>`);
-  $("pMap").innerHTML = `<div class="mapbody">${$("pMap").innerHTML}</div>` + playerHTML();
-  plLast = ""; loadTrack(); plDraw();
+  plLast = ""; loadTrack(); plDraw(); markLines();
 }
 // Raster: eine Kachel pro Takt, durchgezählt über den ganzen Song
+// Teilname antippen: Bearbeitungsfeld direkt hier; „+“ am Ende = ein Takt mehr (lang drücken = einer weniger);
+// Kachel lang drücken = Marker setzen
+let mapEdit = null;
+const PALETTE = ["#9aa5b1", "#4db8ff", "#ffb02e", "#c6ff3d", "#b48cff", "#ff6b5e", "#2ec4b6", "#ff6bd1", "#f2f2f2"];
 function mapGrid(map) {
   let n = 0;
+  const marks = ud().marks || [];
   return `<div class="mapgrid">` + map.map((p, i) => {
     const col = partColor(p);
     let tiles = "";
     for (let r = 0; r < p.rep; r++) {
       if (r) tiles += `<div class="again">Wiederholung ${r + 1}</div>`;
       for (let b = 0; b < p.bars; b++) {
-        tiles += `<div data-bar="${n}" style="border-color:${col};background:${col}2e"><small>${++n}</small></div>`;
+        const mk = marks.filter(k => k.bar === n).sort((a, c) => a.beat - c.beat);
+        tiles += `<div data-bar="${n}" style="border-color:${col};background:${col}2e"><small>${++n}</small>` +
+          (mk.length ? `<i class="mk" style="background:${mk[0].color}">${esc(mk[0].label)}${mk.length > 1 ? " +" + (mk.length - 1) : ""}</i>` : "") + `</div>`;
       }
     }
+    tiles += `<button class="plus" data-a="bars" data-d="1" data-i="${i}" data-lp="minus" aria-label="Takt anhängen">+</button>`;
     return `<div class="lab" id="glab${i}" data-edit="${i}"><span style="color:${col}">${esc(p.name || "–")}</span>
       <small>${p.bars} Takte${p.rep > 1 ? " × " + p.rep : ""}</small>${p.note ? `<span class="nt">${esc(p.note)}</span>` : ""}</div>
-      <div class="bars">${tiles}</div>`;
+      ${mapEdit === i ? partEditor(p, i, map.length) : ""}<div class="bars">${tiles}</div>`;
   }).join("") + `</div>`;
 }
+function partEditor(p, i, count) {
+  const col = partColor(p);
+  return `<div class="ged part" data-i="${i}">
+    <input class="nm" data-k="name" value="${esc(p.name)}" placeholder="Teil" autocomplete="off">
+    <span class="stepper"><button data-a="bars" data-d="-1">−</button><b>${p.bars} Takte</b><button data-a="bars" data-d="1">+</button></span>
+    <span class="stepper"><button data-a="rep" data-d="-1">−</button><b>× ${p.rep}</b><button data-a="rep" data-d="1">+</button></span>
+    <div class="dots">${PALETTE.map(c => `<button data-a="color" data-c="${c}" style="background:${c}" class="${c === col ? "on" : ""}" aria-label="Farbe"></button>`).join("")}
+      <label class="cpick" style="background:${col}" title="Eigene Farbe"><input type="color" data-k="color" value="${col}"></label></div>
+    <input class="nt" data-k="note" value="${esc(p.note)}" placeholder="Hinweis, z. B. nur Bass, Break auf 4" autocomplete="off">
+    <span class="mv"><button data-a="up" ${i ? "" : "disabled"}>↑</button><button data-a="down" ${i < count - 1 ? "" : "disabled"}>↓</button>
+      <button data-a="dup">Kopie</button><button class="danger" data-a="del">✕</button></span>
+    <button class="primary" data-a="done">Fertig</button></div>`;
+}
+// Marker: Umschaltpunkte am MC8 auf Takt + Schlag, unabhängig von den Teilen
+const MARKS = [["G1", "#c6ff3d"], ["G2", "#c6ff3d"], ["G3", "#c6ff3d"], ["SUNSET AUS", "#9aa5b1"],
+  ["+DOT8", "#87ceeb"], ["REV", "#87ceeb"], ["DELAY AUS", "#87ceeb"], ["+FLANGE", "#d3d3d3"], ["SLAP", "#d3d3d3"],
+  ["DECO AUS", "#d3d3d3"], ["+SHIMMER", "#6f8cff"], ["HALL 1", "#6f8cff"], ["LOOP REC", "#ff8c00"], ["LOOP STOP", "#ff8c00"]];
+let markBar = 0, markBeat = 0;
+function openMarker(bar) { markBar = bar; markBeat = 0; renderMarker(); $("marker").classList.add("open"); }
+function renderMarker() {
+  const m = beatsPerBar(), here = (ud().marks || []).map((k, i) => [k, i]).filter(([k]) => k.bar === markBar);
+  $("marker").querySelector(".box").innerHTML = `<div class="tabhead" style="padding:0 0 4px"><b class="grow">Marker in Takt ${markBar + 1}</b>
+      <button class="primary" data-mk="close">Fertig</button></div>
+    ${here.length ? `<div class="mlist">${here.map(([k, i]) => `<div class="tabhead" style="padding:0">
+      <b class="grow" style="color:${k.color}">${esc(k.label)}</b><span class="t">Schlag ${(k.beat || 0) + 1}</span>
+      <button class="danger" data-mk="del" data-i="${i}">✕</button></div>`).join("")}</div>` : ""}
+    <span class="cap">Auf Schlag</span>
+    <div class="mbeats">${Array.from({ length: m }, (_, b) => `<button data-mk="beat" data-b="${b}" class="${b === markBeat ? "on primary" : ""}">${b + 1}</button>`).join("")}</div>
+    <span class="cap">Taster am MC8</span>
+    <div class="mopts">${MARKS.map(([lab, c], i) => `<button data-mk="add" data-i="${i}" style="background:${c}">${lab}</button>`).join("")}</div>
+    <span class="cap">Oder eigener Text</span>
+    <div class="mfree"><input id="mkText" placeholder="z. B. Bridge leise" autocomplete="off"><button data-mk="free">Setzen</button></div>`;
+}
+$("marker").addEventListener("click", (e) => {
+  if (e.target === e.currentTarget) { $("marker").classList.remove("open"); return; }
+  const b = e.target.closest("[data-mk]");
+  if (!b) return;
+  const u = ud(), marks = u.marks = u.marks || [], a = b.dataset.mk;
+  if (a === "close") { $("marker").classList.remove("open"); return; }
+  if (a === "beat") { markBeat = +b.dataset.b; renderMarker(); return; }
+  if (a === "del") marks.splice(+b.dataset.i, 1);
+  if (a === "add") { const [label, color] = MARKS[+b.dataset.i]; marks.push({ bar: markBar, beat: markBeat, label, color }); }
+  if (a === "free") { const t = $("mkText").value.trim(); if (!t) return; marks.push({ bar: markBar, beat: markBeat, label: t, color: "#f2f2f2" }); }
+  marks.sort((x, y) => x.bar - y.bar || x.beat - y.beat);
+  touch(); cueLast = ""; renderMarker();
+  if (page === "map") { const y = $("scroll").scrollTop; renderMap(); $("scroll").scrollTop = y; }
+});
+function markLines() {   // Striche für die Marker auf der farbigen Leiste
+  const bar = document.querySelector(".plmap"), map = ud().map || [];
+  if (!bar) return;
+  bar.querySelectorAll(".mkl").forEach(el => el.remove());
+  const segs = bar.querySelectorAll("[data-goto]"), m = beatsPerBar();
+  (ud().marks || []).forEach(k => {
+    const at = k.bar + (k.beat || 0) / m, here = partAt(Math.floor(at));
+    if (!here || !segs[here.i]) return;
+    const sg = segs[here.i], x = sg.offsetLeft + sg.offsetWidth * (at - partStartBar(here.i)) / (here.p.bars * here.p.rep);
+    bar.insertAdjacentHTML("beforeend", `<i class="mkl" style="left:${x}px;background:${k.color}"></i>`);
+  });
+}
+// Lang drücken: Kachel = Marker, „+“ = ein Takt weniger. Der Klick danach zählt nicht
+let lpTimer = 0, lpAt = 0, lpStart = null;
+$("pMap").addEventListener("pointerdown", (e) => {
+  const t = e.target.closest(".bars [data-bar], .bars [data-lp]");
+  if (!t) return;
+  lpStart = { x: e.clientX, y: e.clientY };
+  clearTimeout(lpTimer);
+  lpTimer = setTimeout(() => {
+    lpAt = Date.now();
+    if (t.dataset.lp === "minus") {
+      const p = ud().map[+t.dataset.i]; p.bars = Math.max(1, p.bars - 1);
+      const y = $("scroll").scrollTop; touch(); renderMap(); $("scroll").scrollTop = y;
+    } else openMarker(+t.dataset.bar);
+  }, 550);
+});
+["pointerup", "pointercancel"].forEach(ev => $("pMap").addEventListener(ev, () => clearTimeout(lpTimer)));
+$("pMap").addEventListener("pointermove", (e) => {
+  if (lpStart && Math.hypot(e.clientX - lpStart.x, e.clientY - lpStart.y) > 10) clearTimeout(lpTimer);
+});
 $("pMap").addEventListener("click", (e) => {
   const u = ud(), map = u.map = u.map || [];
   const v = e.target.closest("[data-view]");
@@ -1095,29 +1220,32 @@ $("pMap").addEventListener("click", (e) => {
     if (pl.buf) { plSeek(barStart(partStartBar(+go.dataset.goto))); return; }
     ($("part" + go.dataset.goto) || $("glab" + go.dataset.goto)).scrollIntoView({ behavior: "smooth", block: "center" }); return;
   }
+  if (Date.now() - lpAt < 700) return;          // war ein langer Druck
   const tile = e.target.closest("[data-bar]");
-  if (tile && pl.buf) { plSeek(barStart(+tile.dataset.bar)); return; }
+  if (tile && audioMaster()) { plSeek(barStart(+tile.dataset.bar)); return; }
   const ed = e.target.closest("[data-edit]");
-  if (ed) {   // Teilname im Raster antippen: zur Liste, dort lässt er sich bearbeiten
-    setting("stage-map-view", "list"); renderMap();
-    $("part" + ed.dataset.edit).scrollIntoView({ block: "center" }); return;
+  if (ed) {   // Teilname im Raster antippen: Bearbeitungsfeld auf/zu
+    mapEdit = mapEdit === +ed.dataset.edit ? null : +ed.dataset.edit;
+    const y = $("scroll").scrollTop; renderMap(); $("scroll").scrollTop = y; return;
   }
   const b = e.target.closest("button");
   if (!b) return;
-  const card = b.closest(".part"), i = card ? +card.dataset.i : -1, p = map[i];
+  const card = b.closest("[data-i]"), i = card ? +card.dataset.i : -1, p = map[i];
   if (b.dataset.add) map.push({ name: b.dataset.add, bars: /intro|outro/i.test(b.dataset.add) ? 4 : 8, rep: 1, chords: "", note: "" });
   else switch (b.dataset.a) {
     case "fromtext": sections().filter(x => x.label)
       .forEach(x => map.push({ name: x.label, bars: 8, rep: 1, chords: "", note: "" })); break;
     case "nocolor": delete p.color; break;
+    case "color": p.color = b.dataset.c; break;
+    case "done": mapEdit = null; break;
     case "bars": p.bars = Math.max(1, Math.min(64, p.bars + +b.dataset.d)); break;
     case "rep": p.rep = Math.max(1, Math.min(16, p.rep + +b.dataset.d)); break;
-    case "up": map.splice(i - 1, 0, map.splice(i, 1)[0]); break;
-    case "down": map.splice(i + 1, 0, map.splice(i, 1)[0]); break;
+    case "up": map.splice(i - 1, 0, map.splice(i, 1)[0]); if (mapEdit === i) mapEdit = i - 1; break;
+    case "down": map.splice(i + 1, 0, map.splice(i, 1)[0]); if (mapEdit === i) mapEdit = i + 1; break;
     case "dup": map.splice(i + 1, 0, Object.assign({}, p)); break;
     case "del":
       if (!b.classList.contains("armed")) { b.classList.add("armed"); b.textContent = "Löschen?"; return; }
-      map.splice(i, 1); break;
+      map.splice(i, 1); mapEdit = null; break;
     default: return;
   }
   const y = $("scroll").scrollTop;
@@ -1128,6 +1256,11 @@ $("pMap").addEventListener("input", (e) => {
   if (!k || !card) return;
   const p = ud().map[+card.dataset.i];
   p[k] = e.target.value; touch();
+  if (card.classList.contains("ged")) {   // Bearbeitungsfeld im Raster: Name gleich oben mitziehen, Farbe neu zeichnen
+    if (k === "name") $("glab" + card.dataset.i).firstChild.textContent = p.name || "–";
+    if (k === "color") { const y = $("scroll").scrollTop; renderMap(); $("scroll").scrollTop = y; }
+    return;
+  }
   if (k === "name" || k === "color") {   // Farbe und Übersicht gleich mitziehen, ohne das Feld neu zu bauen
     const col = partColor(p);
     card.querySelector(".clr").style.background = col; card.querySelector(".cpick").style.background = col;
@@ -1160,7 +1293,7 @@ const idb = (() => {
            del: (k) => run("readwrite", st => st.delete(k)) };
 })();
 const pl = { key: null, buf: null, name: "", ctx: null, stuck: false, src: null, playing: false, startedAt: 0, offset: 0,
-             click: setting("stage-map-click") !== "0", sched: -1, raf: 0, loading: false };
+             click: setting("stage-map-click") !== "0", song: setting("stage-pl-song") !== "0", gain: null, sched: -1, raf: 0, loading: false };
 const plCtx = () => pl.ctx || (pl.ctx = new (window.AudioContext || window.webkitAudioContext)());
 const plPos = () => pl.playing ? pl.ctx.currentTime - pl.startedAt : pl.offset;
 const fmt = (t) => Math.floor(t / 60) + ":" + String(Math.floor(t % 60)).padStart(2, "0");
@@ -1195,14 +1328,29 @@ function partAt(bar) {
   }
   return null;
 }
+// Leiste unten (alle Seiten): rendern, Höhe für die Knöpfe unten rechts merken
+function renderDock() {
+  const on = setting("stage-dock") !== "0";
+  document.body.classList.toggle("docked", on);
+  $("dockBtn").classList.toggle("on", on);
+  $("dock").innerHTML = current === null ? "" : playerHTML();
+  plLast = ""; plDraw(); dockSize();
+}
+function dockSize() {
+  const h = document.body.classList.contains("docked") && !document.body.classList.contains("listing") ? $("dock").offsetHeight : 0;
+  document.documentElement.style.setProperty("--dockh", h + "px");
+}
+$("dockBtn").onclick = () => { setting("stage-dock", setting("stage-dock") === "0" ? "1" : "0"); renderDock(); };
+window.addEventListener("resize", dockSize);
 function playerHTML() {
   if (!pl.buf) return `<div class="mplayer"><div class="tr"><button data-pl="load">♪ Song-Audio laden</button>
-    <span class="t">${pl.loading ? "lädt …" : "MP3 des Songs – dann läuft die Songmap mit, mit Click zum Prüfen."}</span></div></div>`;
+    <span class="t">${pl.loading ? "lädt …" : "MP3 des Songs – dann laufen Songmap, Text und Click mit."}</span></div></div>`;
   const open = setting("stage-pl-more") === "1";
   return `<div class="mplayer${open ? " open" : ""}"><div class="tr">
     <button class="play primary" data-pl="play" id="plPlay">${pl.playing ? "❚❚ Pause" : "▶ Play"}</button>
     <button class="ico" data-pl="start" aria-label="Zum Anfang"><svg viewBox="0 0 24 16" width="30" height="20" fill="currentColor"><path d="M12 0 0 8l12 8zM24 0 12 8l12 8z"/></svg></button>
-    <button data-pl="click" id="plClick" class="flbtn ${pl.click ? "on" : ""}"><i class="fl"></i><span>Click</span></button>
+    <button data-pl="song" class="${pl.song ? "on" : ""}" title="Song-Audio hörbar">Song</button>
+    <button data-pl="click" id="plClick" class="flbtn ${pl.click ? "on" : ""}" title="Click-Ton – das Licht läuft immer"><i class="fl"></i><span>Click</span></button>
     <div class="now"><span class="pos" id="plPos"></span><span class="t" id="plTime"></span></div>
     <button class="more" data-pl="more" aria-label="Mehr: Takt, Versatz, Audio">⋯</button></div>
     <input type="range" class="seek" id="plSeek" min="0" max="${pl.buf.duration.toFixed(2)}" step="0.05" value="${pl.offset}" aria-label="Position im Song">
@@ -1223,7 +1371,7 @@ async function loadTrack() {
     if (rec && pl.key === key) { pl.loading = true; await plDecode(rec.blob, rec.name); }
   } catch (e) {}
   pl.loading = false;
-  if (page === "map" && pl.key === key) renderMap();
+  if (pl.key === key) { renderDock(); if (page === "map") renderMap(); }
 }
 async function plDecode(blob, name) {
   const buf = await blob.arrayBuffer();
@@ -1235,6 +1383,7 @@ function plStop() {
   if (pl.playing) pl.offset = plPos();
   pl.playing = false; cancelAnimationFrame(pl.raf); pl.raf = 0;
   const fb = $("plClick"); if (fb) { fb.firstChild.style.opacity = 0; fb.classList.remove("lit"); }
+  if (typeof drawClick === "function") drawClick();
 }
 function plPlay() {
   // iPad: nach einer Unterbrechung (anderes Audio, Bildschirm aus, Hintergrund) bleibt der Audio-Kontext manchmal
@@ -1246,11 +1395,13 @@ function plPlay() {
   }
   ctx.resume();
   if (pl.offset >= pl.buf.duration - 0.05) pl.offset = 0;
-  const src = ctx.createBufferSource(); src.buffer = pl.buf; src.connect(ctx.destination);
+  const src = ctx.createBufferSource(), gain = ctx.createGain();
+  src.buffer = pl.buf; gain.gain.value = pl.song ? 1 : 0;      // Song stumm = nur Click im Raster des Songs
+  src.connect(gain); gain.connect(ctx.destination); pl.gain = gain;
   pl.startedAt = ctx.currentTime - pl.offset; src.start(0, pl.offset);
-  src.onended = () => { if (pl.src === src) { pl.src = null; pl.playing = false; pl.offset = 0; renderMap(); } };
+  src.onended = () => { if (pl.src === src) { pl.src = null; pl.playing = false; pl.offset = 0; renderDock(); drawClick(); } };
   pl.src = src; pl.playing = true; pl.sched = pl.offset - 0.001;
-  plLoop();
+  plLoop(); drawClick();
   const t0 = ctx.currentTime, from = pl.offset;
   setTimeout(() => {   // läuft die Uhr nicht, hängt der Kontext: anhalten und beim nächsten Play neu anlegen
     if (pl.src !== src || !pl.playing || ctx.currentTime > t0) return;
@@ -1278,7 +1429,7 @@ function plLoop() {
   const fb = $("plClick");
   if (fb) {   // Click-Knopf leuchtet im Beat der Musik
     let flash = 0, one = false;
-    if (pl.playing && pl.click) {
+    if (pl.playing) {   // Licht immer, Ton nur mit Click
       const bar = barAtTime(plPos());
       if (bar >= 0) {
         const bp = (bar - Math.floor(bar)) * beatsPerBar();
@@ -1304,7 +1455,7 @@ function plLoop() {
 }
 let plLast = "";
 function plDraw() {   // Zeit, Takt/Teil, Kopf auf der Leiste, aktuelle Karte bzw. Kachel
-  if (page !== "map" || !pl.buf) return;
+  if (!pl.buf) return;
   const t = plPos(), bar = barAtTime(t), whole = Math.floor(bar), here = whole >= 0 ? partAt(whole) : null;
   const total = (ud().map || []).reduce((n, p) => n + p.bars * p.rep, 0);
   if ($("plTime")) $("plTime").textContent = fmt(t) + " / " + fmt(pl.buf.duration);
@@ -1332,10 +1483,13 @@ function plDraw() {   // Zeit, Takt/Teil, Kopf auf der Leiste, aktuelle Karte bz
 function plAction(a, b) {
   if (a === "load") return $("plFile").click();
   if (a === "more") { const m = b.closest(".mplayer"); m.classList.toggle("open"); setting("stage-pl-more", m.classList.contains("open") ? "1" : "0"); return; }
+  if (a === "click") { setTone(!pl.click); return; }   // Click-Ton geht auch ohne MP3
   if (!pl.buf) return;
   if (a === "play") { if (pl.playing) plStop(); else plPlay(); plLast = ""; plDraw(); return; }
   if (a === "start") { plSeek(0); plLast = ""; plDraw(); return; }
-  if (a === "click") { pl.click = !pl.click; setting("stage-map-click", pl.click ? "1" : "0"); b.classList.toggle("on", pl.click); pl.sched = plPos(); return; }
+  if (a === "song") { pl.song = !pl.song; setting("stage-pl-song", pl.song ? "1" : "0"); b.classList.toggle("on", pl.song);
+    if (pl.gain) pl.gain.gain.value = pl.song ? 1 : 0; return; }
+  if (a === "click") { setTone(!pl.click); return; }
   if (a === "sh" || a === "one") {   // Raster gegen das Audio verschieben
     const u = ud(), t = plPos();
     if (a === "sh") u.audioShift = Math.round(((u.audioShift || 0) + +b.dataset.d) * 1000) / 1000;
@@ -1346,7 +1500,7 @@ function plAction(a, b) {
   if (a === "back" || a === "fwd") { const k = Math.floor(barAtTime(plPos()) + 0.02) + (a === "fwd" ? 1 : -1); plSeek(barStart(Math.max(0, k))); return; }
   if (a === "rm") {
     if (!b.classList.contains("armed")) { b.classList.add("armed"); b.textContent = "Wirklich entfernen?"; return; }
-    plStop(); pl.buf = null; idb.del(pl.key).catch(() => {}); renderMap();
+    plStop(); pl.buf = null; pl.offset = 0; idb.del(pl.key).catch(() => {}); renderDock(); if (page === "map") renderMap();
   }
 }
 // Spulen: Schieberegler oder Finger auf der farbigen Leiste ziehen – beim Loslassen geht es dort weiter
@@ -1355,8 +1509,16 @@ function plScrubTo(t) {
   pl.offset = Math.max(0, Math.min(t, pl.buf.duration - 0.05)); plDraw();
 }
 function plScrubEnd() { if (!pl.scrub) return; const was = pl.scrub.was; pl.scrub = null; if (was) plPlay(); else plDraw(); }
-$("pMap").addEventListener("input", (e) => { if (e.target.id === "plSeek" && pl.buf) plScrubTo(+e.target.value); });
-$("pMap").addEventListener("change", (e) => { if (e.target.id === "plSeek") plScrubEnd(); });
+$("dock").addEventListener("input", (e) => { if (e.target.id === "plSeek" && pl.buf) plScrubTo(+e.target.value); });
+$("dock").addEventListener("change", (e) => { if (e.target.id === "plSeek") plScrubEnd(); });
+$("dock").addEventListener("click", (e) => { const pb = e.target.closest("[data-pl]"); if (pb) plAction(pb.dataset.pl, pb); });
+new ResizeObserver(dockSize).observe($("dock"));
+function setTone(on) {   // Click-Ton an/aus – gilt für Song-Audio und Click ohne Song
+  pl.click = on; setting("stage-map-click", on ? "1" : "0");
+  if (on) try { plCtx().resume(); } catch (e) {}
+  document.querySelectorAll("[data-pl=click], [data-ck=tone]").forEach(b => b.classList.toggle("on", on));
+  pl.sched = plPos(); clk.beeped = -1e9;
+}
 function timeAtX(bar, x) {   // x in der farbigen Leiste → Zeit im Song
   const segs = [...bar.querySelectorAll("[data-goto]")], map = ud().map || [];
   for (let i = 0; i < segs.length; i++) {
@@ -1391,13 +1553,13 @@ function mapDragStop() {
 $("plFile").onchange = async (e) => {
   const f = e.target.files[0]; e.target.value = "";
   if (!f || current === null) return;
-  plStop(); pl.loading = true; pl.buf = null; renderMap();
+  plStop(); pl.loading = true; pl.buf = null; renderDock();
   try {
     await plDecode(f, f.name);
     pl.offset = 0;
     idb.put(pl.key, { blob: f, name: f.name }).catch(() => {});   // bleibt auf dem Gerät für das nächste Mal
   } catch (err) { toast("Diese Datei kann ich nicht abspielen: " + f.name, 8000); }
-  pl.loading = false; renderMap();
+  pl.loading = false; renderDock(); if (page === "map") renderMap();
 };
 
 // TABS
@@ -1524,7 +1686,7 @@ $("songs").onclick = (e) => {
 $("pText").onclick = (e) => { const el = e.target.closest("section"); if (el) { section = +el.dataset.i; highlight(); } };
 $("toggleList").onclick = () => {
   if (current === null) return;
-  document.body.classList.toggle("listing"); renderList();
+  document.body.classList.toggle("listing"); renderList(); dockSize();
 };
 function fontSize(d) {
   const size = Math.max(18, Math.min(80, (+setting("stage-size") || 34) + d));
@@ -1537,14 +1699,17 @@ $("bigger").onclick = () => fontSize(4);
 // ---------- CLICK: sichtbarer Takt aus Songtempo, Tap am iPad oder MIDI-Clock vom MC8 ----------
 // Ein durchlaufender Schlagzähler (globalBeat); offset legt fest, welcher Schlag die Eins von Takt 1 ist.
 const clk = { on: setting("stage-click") === "1", tapBpm: 0, t0: performance.now(), offset: 0, taps: [],
-  ticks: 0, tickAt: -1e9, tickTimes: [], clockBpm: 0, raf: 0, shape: "", last: "" };
+  ticks: 0, tickAt: -1e9, tickTimes: [], clockBpm: 0, raf: 0, shape: "", last: "", beeped: -1e9 };
 // Helligkeit für Fläche und Randstreifen; die Eins leuchtet voll, die anderen Schläge gedämpft
 const clickBright = () => (+setting("stage-click-bright") || 80) / 100;
 const OFFBEAT = 0.25;
 const clockLive = () => performance.now() - clk.tickAt < 600 && clk.clockBpm > 0;
 const songTempo = () => parseFloat(val("tempo", songs[current].tempo)) || 0;
 const clickBpm = () => clockLive() ? clk.clockBpm : clk.tapBpm || songTempo();
-const clickSource = () => clockLive() ? "MC8-Clock" : clk.tapBpm ? "Tap" : "Songtempo";
+const clickSource = () => audioMaster() ? "Song-Audio" : clockLive() ? "MC8-Clock" : clk.tapBpm ? "Tap" : "Songtempo";
+// Eine Song-Position für alle Seiten: läuft (oder steht mitten im Song) die MP3, ist sie die Uhr –
+// sonst MC8-Clock > Tap > Songtempo. Zurück auf den Anfang = wieder Click ohne Song
+const audioMaster = () => !!pl.buf && current !== null && pl.key === songKey(songs[current]) && (pl.playing || pl.offset > 0.05);
 function globalBeat(now) {
   if (clockLive()) return (clk.ticks + Math.min(1, (now - clk.tickAt) * clk.clockBpm * 24 / 60000)) / 24;
   const bpm = clickBpm();
@@ -1580,24 +1745,44 @@ function tapTempo() {
   if (!clk.on) setClick(true); else { clk.shape = ""; renderClick(); }
 }
 function clickState() {
-  const sig = timeSig(), sb = globalBeat(performance.now()) - clk.offset, whole = Math.floor(sb);
-  return { sig, sb, beat: ((whole % sig.beats) + sig.beats) % sig.beats, phase: sb - whole,
-           bar: Math.floor(whole / sig.beats) + 1, bpm: clickBpm() };
+  const sig = timeSig(), m = sig.beats;
+  if (audioMaster()) {   // Schlag und Takt aus dem Raster der MP3
+    const bar = barAtTime(plPos()), sb = bar * m, whole = Math.floor(sb), k = Math.floor(bar);
+    const len = barStart(k + 1) - barStart(k);
+    return { sig, sb, beat: ((whole % m) + m) % m, phase: sb - whole, bar: Math.floor(whole / m) + 1,
+             bpm: len > 0 ? 60 * m / len : songTempo(), audio: true, running: pl.playing };
+  }
+  const sb = globalBeat(performance.now()) - clk.offset, whole = Math.floor(sb);
+  return { sig, sb, beat: ((whole % m) + m) % m, phase: sb - whole,
+           bar: Math.floor(whole / m) + 1, bpm: clickBpm(), audio: false, running: clk.on };
+}
+function clockBeeps(st) {   // Click-Ton ohne MP3: die Schläge der nächsten 0,15 s auf der Audio-Uhr einplanen
+  if (!pl.click || st.audio || !st.bpm) return;
+  const ctx = plCtx();
+  if (ctx.state !== "running") return;
+  if (st.sb < clk.beeped - 1) clk.beeped = -1e9;            // Eins neu gesetzt / zurückgesprungen
+  for (let n = Math.ceil(st.sb); n <= st.sb + st.bpm / 60 * 0.15; n++) {
+    if (n <= clk.beeped) continue;
+    plBeep(ctx.currentTime + (n - st.sb) * 60 / st.bpm, ((n % st.sig.beats) + st.sig.beats) % st.sig.beats === 0);
+    clk.beeped = n;
+  }
 }
 function drawClick() {   // pro Bild: kleine Anzeige im Kopf und (falls offen) die CLICK-Seite
   cancelAnimationFrame(clk.raf); clk.raf = 0;
   if (current === null) return;
   const st = clickState(), btn = $("clickBtn");
-  const shape = [clk.on, st.sig.beats, Math.round(st.bpm)].join();
+  const shape = [st.running, st.audio, st.sig.beats, Math.round(st.bpm)].join();
   if (shape !== clk.shape) {
     clk.shape = shape;
-    btn.classList.toggle("on", clk.on);
-    document.body.classList.toggle("clicking", clk.on && !!st.bpm);
-    btn.innerHTML = `<i class="fl"></i><span>${clk.on && st.bpm ? `<b>Click</b> ${Math.round(st.bpm)}` : "Click"}</span>`;
+    btn.classList.toggle("on", st.running);
+    document.body.classList.toggle("clicking", st.running && !!st.bpm);
+    btn.innerHTML = `<i class="fl"></i><span>${st.running && st.bpm ? `<b>Click</b> ${Math.round(st.bpm)}` : "Click"}</span>`;
     clk.last = "";
     if ($("ckBpm")) { $("ckBpm").textContent = st.bpm ? Math.round(st.bpm) : "–"; $("ckSrc").textContent = clickSource(); }
   }
-  if (!clk.on || !st.bpm) return;
+  followTick(st); cueTick(st);
+  if (!st.running || !st.bpm) { btn.firstChild.style.opacity = 0; btn.classList.remove("lit"); return; }
+  clockBeeps(st);
   const key = st.bar + "." + st.beat;
   if (key !== clk.last) {   // neuer Schlag
     clk.last = key;
@@ -1621,6 +1806,60 @@ function drawClick() {   // pro Bild: kleine Anzeige im Kopf und (falls offen) d
   clk.raf = requestAnimationFrame(drawClick);
 }
 const mapBars = () => (ud().map || []).reduce((n, p) => n + p.bars * p.rep, 0);
+// Mitlesen: Teil der Songmap ↔ Teil im Text, der Reihe nach über die Art (Strophe = Verse, Refrain = Chorus …)
+const PART_GROUPS = [/intro/, /strophe|verse|vers\b/, /refrain|chorus|hook/, /bridge|c-teil/, /solo/, /outro|ende|end\b/,
+  /instrumental|break|inter|zwischen/];
+const partGroup = (n) => { n = (n || "").toLowerCase(); return /pre/.test(n) ? 99 : PART_GROUPS.findIndex(r => r.test(n)); };
+function partSections() {
+  const secs = sections(), out = [];
+  let j = 0;
+  (ud().map || []).forEach((p, i) => {
+    const g = partGroup(p.name);
+    out[i] = null;
+    for (let k = j; g >= 0 && k < Math.min(secs.length, j + 4); k++) if (partGroup(secs[k].label) === g) { out[i] = k; j = k + 1; break; }
+  });
+  return out;
+}
+const follow = () => setting("stage-follow") === "1";
+let followPart = -2;
+function followTick(st) {
+  if (!follow() || current === null) return;
+  const here = st.bar >= 1 ? partAt(st.bar - 1) : null, i = here ? here.i : -1;
+  if (i === followPart) return;
+  followPart = i;
+  const k = i >= 0 ? partSections()[i] : null;
+  if (k === null || k === undefined) return;
+  section = k; highlight(page === "text");
+}
+function setFollow(on) {
+  setting("stage-follow", on ? "1" : "0"); followPart = -2;
+  document.body.classList.toggle("follow", on); $("followBtn").classList.toggle("on", on);
+  if (on) drawClick();
+}
+$("followBtn").onclick = () => setFollow(!follow());
+// Vorwarnung vor dem nächsten Marker (TEXT und CLICK): „→ G3 in 2 Takten“, auf dem Schlag „JETZT“
+let cueLast = "";
+function cueTick(st) {
+  const el = $("cue"), marks = current === null ? [] : ud().marks || [];
+  let txt = "", col = "", now = false;
+  if (marks.length && st.running && (page === "text" || page === "click")) {
+    const m = st.sig.beats, pos = st.sb / m;           // Position in Takten ab Takt 1 (0-basiert)
+    const next = marks.map(k => ({ k, at: k.bar + (k.beat || 0) / m })).filter(x => x.at > pos - 0.25 / m * 4 && x.at - pos < 4)
+      .sort((a, b) => a.at - b.at)[0];
+    if (next) {
+      const d = next.at - pos;
+      now = d <= 0.02;
+      txt = now ? "JETZT " + next.k.label : d < 1 ? `→ ${next.k.label} auf ${(next.k.beat || 0) + 1}` :
+        `→ ${next.k.label} in ${Math.ceil(d)} Takt${Math.ceil(d) > 1 ? "en" : ""}`;
+      col = next.k.color;
+    }
+  }
+  const key = txt + now;
+  if (key === cueLast) return;
+  cueLast = key;
+  el.textContent = txt; el.classList.toggle("show", !!txt); el.classList.toggle("now", now);
+  el.style.setProperty("--mk", col || "var(--fg)");
+}
 function clickPos(st) {   // Takt, Teil der Songmap, was als Nächstes kommt
   const set = (id, t) => { const el = $(id); if (el) el.textContent = t; };
   set("ckBar", st.bar > 0 ? st.bar : "–");
@@ -1638,11 +1877,12 @@ function clickPos(st) {   // Takt, Teil der Songmap, was als Nächstes kommt
 }
 function renderClick() {
   if (current === null) return;
-  const st = clickState(), map = ud().map || [], live = clockLive();
+  const st = clickState(), map = ud().map || [], live = clockLive() || st.audio;
   const saved = songTempo(), tapDiff = clk.tapBpm && clk.tapBpm !== saved, flash = setting("stage-click-view") === "flash";
   const ctl = `<div class="ckctl">
-      <button class="${clk.on ? "" : "primary"}" data-ck="run">${clk.on ? "Stopp" : "Start"}</button>
-      <button data-ck="one" ${clk.on ? "" : "disabled"}>Eins</button>
+      <button class="${st.running ? "" : "primary"}" data-ck="run">${st.running ? "Stopp" : "Start"}</button>
+      <button data-ck="tone" class="${pl.click ? "on" : ""}">Ton</button>
+      <button data-ck="one" ${clk.on && !st.audio ? "" : "disabled"}>Eins</button>
       <button class="tap" data-ck="tap" ${live ? "disabled" : ""}>TAP</button>
       <button data-ck="-1" ${live || !st.bpm ? "disabled" : ""}>−</button>
       <button data-ck="1" ${live || !st.bpm ? "disabled" : ""}>+</button>
@@ -1668,12 +1908,13 @@ function renderClick() {
       ${esc(p.name || "–")}<small>${p.bars}${p.rep > 1 ? " × " + p.rep : ""}</small></a>`).join("")}<i class="head"></i></div>
       <div class="cknow"><b id="ckPart"></b><span id="ckPartPos"></span><span class="nx" id="ckNext"></span></div>` : ""}
     ${ctl}
-    <p class="hint">${live ? "Tempo kommt vom MC8 (MIDI-Clock). Tap am MC8 ändert es hier mit." :
+    <p class="hint">${st.audio ? "Läuft mit dem Song-Audio (Leiste unten). Zurück auf den Anfang = Click ohne Song." :
+      live ? "Tempo kommt vom MC8 (MIDI-Clock). Tap am MC8 ändert es hier mit." :
       "Läuft mit dem Songtempo oder deinem Tap hier. Sobald der MC8 seine MIDI-Clock ans iPad schickt, übernimmt er."}
       „Eins“ macht den aktuellen Schlag zur Eins von Takt 1 – zum Beispiel beim Einzählen.</p>`;
   clk.shape = ""; clk.last = "";
   drawClick();
-  if (!clk.on) clickPos(st);
+  if (!st.running) clickPos(st);
 }
 $("clickBtn").onclick = () => setClick(!clk.on);
 $("pClick").addEventListener("input", (e) => {
@@ -1687,6 +1928,7 @@ $("pClick").addEventListener("click", (e) => {
   const go = e.target.closest("[data-goto]");
   if (go) {   // auf einen Teil tippen: dort geht es los
     e.preventDefault();
+    if (audioMaster()) { plSeek(barStart(partStartBar(+go.dataset.goto))); return; }
     const map = ud().map || [];
     let bars = 0; for (let i = 0; i < +go.dataset.goto; i++) bars += map[i].bars * map[i].rep;
     downbeat(); clk.offset -= bars * beatsPerBar(); clk.last = ""; return;
@@ -1696,7 +1938,12 @@ $("pClick").addEventListener("click", (e) => {
   const b = e.target.closest("[data-ck]");
   if (!b || b.disabled) return;
   const a = b.dataset.ck;
-  if (a === "run") return setClick(!clk.on);
+  if (a === "run") {
+    try { plCtx().resume(); } catch (err) {}
+    if (audioMaster()) { if (pl.playing) plStop(); else plPlay(); renderDock(); renderClick(); return; }
+    return setClick(!clk.on);
+  }
+  if (a === "tone") return setTone(!pl.click);
   if (a === "one") { downbeat(); clk.last = ""; return; }
   if (a === "save") { ud().tempo = String(clk.tapBpm); touch(); clk.tapBpm = 0; renderMeta(); renderClick(); return; }
   if (a === "1" || a === "-1") { setTempo(() => { clk.tapBpm = Math.max(30, Math.min(300, Math.round(clickBpm()) + +a)); }); renderClick(); }
@@ -1783,6 +2030,7 @@ async function midi() {
 
 async function keepAwake() { try { if ("wakeLock" in navigator) await navigator.wakeLock.request("screen"); } catch (e) {} }
 document.addEventListener("visibilitychange", () => { if (!document.hidden) keepAwake(); });
+setFollow(follow());
 // Offline: App im Gerät zwischenspeichern (sw.js). Geht nur in Browsern mit Service Worker (Safari, Home-Bildschirm)
 if ("serviceWorker" in navigator && location.protocol === "https:") {
   navigator.serviceWorker.register("sw.js").then(() => navigator.serviceWorker.ready)
